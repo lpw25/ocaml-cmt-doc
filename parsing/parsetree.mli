@@ -53,7 +53,7 @@ and row_field =
 type 'a class_infos =
   { pci_virt: virtual_flag;
     pci_params: string loc list * Location.t;
-    pci_name: string loc;
+    pci_name: string doc;
     pci_expr: 'a;
     pci_variance: (bool * bool) list;
     pci_loc: Location.t }
@@ -141,9 +141,9 @@ and type_declaration =
 and type_kind =
     Ptype_abstract
   | Ptype_variant of
-      (string loc * core_type list * core_type option * Location.t) list
+      (string loc * core_type list * core_type option * Location.t * Info.comment) list
   | Ptype_record of
-      (string loc * mutable_flag * core_type * Location.t) list
+      (string loc * mutable_flag * core_type * Location.t * Info.comment) list
 
 and exception_declaration = core_type list
 
@@ -205,13 +205,14 @@ and class_field = {
   }
 
 and class_field_desc =
-    Pcf_inher of override_flag * class_expr * string option
-  | Pcf_valvirt of (string loc * mutable_flag * core_type)
-  | Pcf_val of (string loc * mutable_flag * override_flag * expression)
-  | Pcf_virt  of (string loc * private_flag * core_type)
-  | Pcf_meth of (string loc * private_flag *override_flag * expression)
+    Pcf_inher of override_flag * class_expr * string option * Info.comment
+  | Pcf_valvirt of (string doc * mutable_flag * core_type)
+  | Pcf_val of (string doc * mutable_flag * override_flag * expression)
+  | Pcf_virt  of (string doc * private_flag * core_type)
+  | Pcf_meth of (string doc * private_flag *override_flag * expression)
   | Pcf_constr  of (core_type * core_type)
   | Pcf_init  of expression
+  | Pcf_comment of Info.comment
 
 and class_declaration = class_expr class_infos
 
@@ -235,16 +236,17 @@ and signature_item =
     psig_loc: Location.t }
 
 and signature_item_desc =
-    Psig_value of string loc * value_description
-  | Psig_type of (string loc * type_declaration) list
-  | Psig_exception of string loc * exception_declaration
-  | Psig_module of string loc * module_type
-  | Psig_recmodule of (string loc * module_type) list
-  | Psig_modtype of string loc * modtype_declaration
+    Psig_value of string doc * value_description
+  | Psig_type of (string doc * type_declaration) list
+  | Psig_exception of string doc * exception_declaration
+  | Psig_module of string doc * module_type
+  | Psig_recmodule of (string doc * module_type) list
+  | Psig_modtype of string doc * modtype_declaration
   | Psig_open of Longident.t loc
-  | Psig_include of module_type
+  | Psig_include of module_type * Info.info
   | Psig_class of class_description list
   | Psig_class_type of class_type_declaration list
+  | Psig_comment of Info.comment
 
 and modtype_declaration =
     Pmodtype_abstract
@@ -278,18 +280,19 @@ and structure_item =
 
 and structure_item_desc =
     Pstr_eval of expression
-  | Pstr_value of rec_flag * (pattern * expression) list
-  | Pstr_primitive of string loc * value_description
-  | Pstr_type of (string loc * type_declaration) list
-  | Pstr_exception of string loc * exception_declaration
-  | Pstr_exn_rebind of string loc * Longident.t loc
-  | Pstr_module of string loc * module_expr
-  | Pstr_recmodule of (string loc * module_type * module_expr) list
-  | Pstr_modtype of string loc * module_type
+  | Pstr_value of rec_flag * ((pattern * expression) * Info.info) list
+  | Pstr_primitive of string doc * value_description
+  | Pstr_type of (string doc * type_declaration) list
+  | Pstr_exception of string doc * exception_declaration
+  | Pstr_exn_rebind of string doc * Longident.t loc
+  | Pstr_module of string doc * module_expr
+  | Pstr_recmodule of (string doc * module_type * module_expr) list
+  | Pstr_modtype of string doc * module_type
   | Pstr_open of Longident.t loc
   | Pstr_class of class_declaration list
   | Pstr_class_type of class_type_declaration list
-  | Pstr_include of module_expr
+  | Pstr_include of module_expr * Info.info
+  | Pstr_comment of Info.comment
 
 (* Toplevel phrases *)
 
