@@ -76,7 +76,7 @@ type param = (string * text)
 type raised_exception = (string * text)
 
 (** Information in a special comment. *)
-type info = {
+type doc_info = {
     i_desc : text option; (** The description text. *)
     i_authors : string list; (** The list of authors in \@author tags. *)
     i_version : string option; (** The string in the \@version tag. *)
@@ -90,5 +90,16 @@ type info = {
     i_custom : (string * text) list ; (** A text associated to a custom @-tag. *)
   }
 
-(** An empty info structure. *)
-val dummy_info : info
+(** An empty doc_info structure. *)
+val dummy_info : doc_info
+
+type comment = text option
+
+type info = doc_info option
+
+type 'a doc =
+  { dtxt: 'a;
+    dloc: Location.t;
+    info: info; }
+
+val mkdoc : 'a -> Location.t -> info -> 'a doc

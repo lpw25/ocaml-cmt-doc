@@ -63,7 +63,7 @@ type param = (string * text)
 
 type raised_exception = (string * text)
 
-type info = {
+type doc_info = {
     i_desc : text option;
     i_authors : string list;
     i_version : string option;
@@ -90,3 +90,14 @@ let dummy_info = {
   i_return_value = None ;
   i_custom = [] ;
 }
+
+type comment = text option
+
+type info = doc_info option
+
+type 'a doc =
+  { dtxt: 'a;
+    dloc: Location.t;
+    info: info; }
+
+let mkdoc txt loc info = { dtxt = txt; dloc = loc; info }

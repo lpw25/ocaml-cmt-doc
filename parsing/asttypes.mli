@@ -41,3 +41,9 @@ type 'a loc = 'a Location.loc = {
   txt : 'a;
   loc : Location.t;
 }
+
+type 'a doc = 'a Info.doc =  { 
+  dtxt: 'a;
+  dloc: Location.t;
+  info: Info.info; 
+}
