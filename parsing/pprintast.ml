@@ -687,9 +687,9 @@ class printer  ()= object(self:'self)
     
   (* [class type a = object end] *)  
   method class_type_declaration_list f  l =
-    let class_type_declaration f ({pci_params=(ls,_);pci_name={txt;_};pci_variance;_} as x) =
+    let class_type_declaration f ({pci_params=(ls,_);pci_name={dtxt;_};pci_variance;_} as x) =
       pp f "%a%a%s@ =@ %a" self#virtual_flag x.pci_virt
-        self#class_params_def (List.combine ls pci_variance) txt
+        self#class_params_def (List.combine ls pci_variance) dtxt
         self#class_type x.pci_expr in 
     match l with
     | [] -> () 
@@ -700,20 +700,20 @@ class printer  ()= object(self:'self)
 
   method class_field f x =
     match x.pcf_desc with
-    | Pcf_inher (ovf, ce, so) ->
+    | Pcf_inher (ovf, ce, so, com) ->
         pp f "@[<2>inherit@ %s@ %a%a@]"  (override ovf) self#class_expr ce
           (fun f so -> match so with
           | None -> ();
           | Some (s) -> pp f "@ as %s" s ) so 
     | Pcf_val (s, mf, ovf, e) ->
         pp f "@[<2>val%s %a%s =@;%a@]" (override ovf)  self#mutable_flag mf
-          s.txt  self#expression  e 
+          s.dtxt  self#expression  e 
     | Pcf_virt (s, pf, ct) ->
         pp f "@[<2>method virtual %a %s :@;%a@]"
-          self#private_flag pf s.txt self#core_type  ct
+          self#private_flag pf s.dtxt self#core_type  ct
     | Pcf_valvirt (s, mf, ct) ->
         pp f "@[<2>val virtual %a%s :@ %a@]"
-          self#mutable_flag mf s.txt
+          self#mutable_flag mf s.dtxt
           self#core_type  ct
     | Pcf_meth (s, pf, ovf, e) ->
         pp f "@[<2>method%s %a%a@]"
@@ -722,15 +722,16 @@ class printer  ()= object(self:'self)
           (fun f e -> match e.pexp_desc with
           | Pexp_poly (e, Some ct) ->
               pp f "%s :@;%a=@;%a"
-                s.txt (self#core_type) ct self#expression e
+                s.dtxt (self#core_type) ct self#expression e
           | Pexp_poly (e,None) ->
-              self#binding f ({ppat_desc=Ppat_var s;ppat_loc=Location.none} ,e)
+              self#binding f ({ppat_desc=Ppat_var {txt=s.dtxt;loc=s.dloc};ppat_loc=Location.none} ,e)
           | _ ->
               self#expression f e ) e 
     | Pcf_constr (ct1, ct2) ->
         pp f "@[<2>constraint %a =@;%a@]" self#core_type  ct1 self#core_type  ct2
     | Pcf_init (e) ->
         pp f "@[<2>initializer@ %a@]" self#expression e 
+    | Pcf_comment _ -> ()
 
   method class_structure f { pcstr_pat = p; pcstr_fields =  l } =
     pp f "@[<hv0>@[<hv2>object %a@;%a@]@;end@]" 
@@ -809,20 +810,20 @@ class printer  ()= object(self:'self)
         pp f "@[<2>%a@]"
           (fun f (s,vd) -> 
             let intro = if vd.pval_prim = [] then "val" else "external" in
-            if (is_infix (fixity_of_string s.txt)) || List.mem s.txt.[0] prefix_symbols then
-              pp f "%s@ (@ %s@ )@ :@ " intro s.txt                
+            if (is_infix (fixity_of_string s.dtxt)) || List.mem s.dtxt.[0] prefix_symbols then
+              pp f "%s@ (@ %s@ )@ :@ " intro s.dtxt                
             else
-              pp f "%s@ %s@ :@ " intro s.txt;
+              pp f "%s@ %s@ :@ " intro s.dtxt;
             self#value_description f vd;) (s,vd)
     | Psig_exception (s, ed) ->
-        self#exception_declaration f (s.txt,ed)
+        self#exception_declaration f (s.dtxt,ed)
     | Psig_class l ->
-        let class_description f ({pci_params=(ls,_);pci_name={txt;_};pci_variance;_} as x) =
+        let class_description f ({pci_params=(ls,_);pci_name={dtxt;_};pci_variance;_} as x) =
           pp f "%a%a%s@;:@;%a" (* "@[<2>class %a%a%s@;:@;%a@]" *)
             self#virtual_flag x.pci_virt
             self#class_params_def
             (List.combine ls pci_variance)
-            txt  self#class_type x.pci_expr in 
+            dtxt  self#class_type x.pci_expr in 
         pp f  "@[<0>%a@]"
           (fun f l ->  match l with
             |[]  ->()
@@ -831,16 +832,16 @@ class printer  ()= object(self:'self)
                   class_description f l) l 
     | Psig_module (s, mt) ->
         pp f "@[<hov>module@ %s@ :@ %a@]"
-          s.txt
+          s.dtxt
           self#module_type  mt
     | Psig_open li ->
         pp f "@[<hov2>open@ %a@]" self#longident_loc li
-    | Psig_include (mt) ->
+    | Psig_include (mt, info) ->
         pp f "@[<hov2>include@ %a@]"
           self#module_type  mt
     | Psig_modtype (s, md) ->
         pp f "@[<hov2>module@ type@ %s%a@]"
-          s.txt
+          s.dtxt
           (fun f md -> match md with
           | Pmodtype_abstract -> ()
           | Pmodtype_manifest (mt) ->
@@ -856,12 +857,13 @@ class printer  ()= object(self:'self)
           | (s,mty) :: tl ->
               if not first then
                 pp f "@ @[<hov2>and@ %s:@ %a@]"
-                  s.txt self#module_type mty
+                  s.dtxt self#module_type mty
               else
                 pp f "@ @[<hov2>module@ rec@ %s:@ %a@]"
-                  s.txt self#module_type mty;
+                  s.dtxt self#module_type mty;
               string_x_module_type_list f ~first:false tl  in
         string_x_module_type_list f decls
+    | Psig_comment _ -> ()
   end
   method module_expr f x =
     match x.pmod_desc with
@@ -948,8 +950,8 @@ class printer  ()= object(self:'self)
     | Pstr_type [] -> assert false
     | Pstr_type l  -> self#type_def_list f l 
     | Pstr_value (rf, l) -> (* pp f "@[<hov2>let %a%a@]"  self#rec_flag rf self#bindings l *)
-        pp f "@[<2>%a@]" self#bindings (rf,l)
-    | Pstr_exception (s, ed) -> self#exception_declaration f (s.txt,ed)
+        pp f "@[<2>%a@]" self#bindings (rf, List.map fst l)
+    | Pstr_exception (s, ed) -> self#exception_declaration f (s.dtxt,ed)
     | Pstr_module (s, me) ->
         let rec module_helper me = match me.pmod_desc with
         | Pmod_functor(s,mt,me) ->
@@ -957,7 +959,7 @@ class printer  ()= object(self:'self)
             module_helper me
         | _ -> me in 
         pp f "@[<hov2>module %s%a@]"
-          s.txt
+          s.dtxt
           (fun f me ->
             let me = module_helper me  in
             (match me.pmod_desc with
@@ -972,11 +974,11 @@ class printer  ()= object(self:'self)
     | Pstr_open (li) ->
         pp f "open %a" self#longident_loc li;
     | Pstr_modtype (s, mt) ->
-        pp f "@[<2>module type %s =@;%a@]" s.txt self#module_type mt 
+        pp f "@[<2>module type %s =@;%a@]" s.dtxt self#module_type mt 
     | Pstr_class l ->
         let class_declaration f  (* for the second will be changed to and FIXME*)
             ({pci_params=(ls,_);
-              pci_name={txt;_};
+              pci_name={dtxt;_};
               pci_virt;
               pci_expr={pcl_desc;_};
               pci_variance;_ } as x) =
@@ -986,7 +988,7 @@ class printer  ()= object(self:'self)
               self#label_exp f (l,eo,p);
               class_fun_helper f e
           | _ -> e in
-          pp f "%a%a%s %a"  self#virtual_flag pci_virt self#class_params_def ls txt 
+          pp f "%a%a%s %a"  self#virtual_flag pci_virt self#class_params_def ls dtxt 
             (fun f _ ->  
               let ce =
                 (match pcl_desc with
@@ -1011,25 +1013,26 @@ class printer  ()= object(self:'self)
         self#class_type_declaration_list f l ;
     | Pstr_primitive (s, vd) ->
         let need_parens =
-          match s.txt with
+          match s.dtxt with
           | "or" | "mod" | "land"| "lor" | "lxor" | "lsl" | "lsr" | "asr" -> true
-          | _ -> match s.txt.[0] with
+          | _ -> match s.dtxt.[0] with
               'a'..'z' -> false | _ -> true in
         pp f "@[<hov2>external@ %s@ :@ %a@]"
-          (if need_parens then "( "^s.txt^" )" else s.txt)
+          (if need_parens then "( "^s.dtxt^" )" else s.dtxt)
           self#value_description  vd
-    | Pstr_include me ->
+    | Pstr_include(me, info) ->
         pp f "@[<hov2>include@ %a@]"  self#module_expr  me 
     | Pstr_exn_rebind (s, li) ->        (* todo: check this *)
-        pp f "@[<hov2>exception@ %s@ =@ %a@]" s.txt self#longident_loc li 
+        pp f "@[<hov2>exception@ %s@ =@ %a@]" s.dtxt self#longident_loc li 
+    | Pstr_comment _ -> ()
     | Pstr_recmodule decls -> (* 3.07 *)
         let text_x_modtype_x_module f (s, mt, me) =
           pp f "@[<hov2>and@ %s:%a@ =@ %a@]"
-            s.txt self#module_type mt self#module_expr me
+            s.dtxt self#module_type mt self#module_expr me
         in match decls with
         | (s,mt,me):: l2 ->
             pp f "@[<hv>@[<hov2>module@ rec@ %s:%a@ =@ %a@]@ %a@]"
-              s.txt
+              s.dtxt
               self#module_type mt
               self#module_expr me 
               (fun f l2 -> List.iter (text_x_modtype_x_module f) l2) l2 
@@ -1045,7 +1048,7 @@ class printer  ()= object(self:'self)
         (fun f l -> match l with
         |[] -> ()
         | _ ->  pp f "%a@;" (self#list self#type_param ~first:"(" ~last:")" ~sep:",") l)
-        ptype_params s.txt
+        ptype_params s.dtxt
         (fun f td ->begin match ptype_kind, ptype_manifest with
         | Ptype_abstract, None -> ()
         | _ , _ -> pp f " =@;" end;
@@ -1057,7 +1060,7 @@ class printer  ()= object(self:'self)
           (self#list aux ~sep:"@]@,@[<2>and " ~last:"@]@]") xs 
           (* called by type_def_list *)        
   method type_declaration f x = begin
-    let  type_variant_leaf f  (s, l,gadt, _loc)  = match gadt with
+    let  type_variant_leaf f  (s, l,gadt, _loc, _com)  = match gadt with
     |None -> 
         pp f "@\n|@;%s%a" s.txt
           (fun f l -> match l with
@@ -1085,7 +1088,7 @@ class printer  ()= object(self:'self)
             (self#list ~sep:"" type_variant_leaf) xs
       | Ptype_abstract -> ()
       | Ptype_record l ->
-          let type_record_field f (s, mf, ct,_) =
+          let type_record_field f (s, mf, ct, _, _) =
             pp f "@[<2>%a%s:@;%a@]" self#mutable_flag mf s.txt self#core_type ct in
           pp f "{@\n%a}"
             (self#list type_record_field ~sep:";@\n" )  l ;

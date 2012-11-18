@@ -14,6 +14,7 @@
 
 %{
 open Location
+open Info
 open Asttypes
 open Longident
 open Parsetree
@@ -43,6 +44,7 @@ let mkctf d =
 let mkcf d =
   { pcf_desc = d; pcf_loc = symbol_rloc () }
 let mkrhs rhs pos = mkloc rhs (rhs_loc pos)
+let mkdocrhs rhs pos = mkdoc rhs (rhs_loc pos) None
 let mkoption d =
   { ptyp_desc = Ptyp_constr(mknoloc (Ldot (Lident "*predef*", "option")), [d]);
     ptyp_loc = d.ptyp_loc}
@@ -572,22 +574,22 @@ structure_item:
     LET rec_flag let_bindings
       { match $3 with
           [{ ppat_desc = Ppat_any; ppat_loc = _ }, exp] -> mkstr(Pstr_eval exp)
-        | _ -> mkstr(Pstr_value($2, List.rev $3)) }
+        | _ -> mkstr(Pstr_value($2, List.rev_map (fun b -> (b, None)) $3)) }
   | EXTERNAL val_ident COLON core_type EQUAL primitive_declaration
-      { mkstr(Pstr_primitive(mkrhs $2 2, {pval_type = $4; pval_prim = $6;
+      { mkstr(Pstr_primitive(mkdocrhs $2 2, {pval_type = $4; pval_prim = $6;
           pval_loc = symbol_rloc ()})) }
   | TYPE type_declarations
       { mkstr(Pstr_type(List.rev $2)) }
   | EXCEPTION UIDENT constructor_arguments
-      { mkstr(Pstr_exception(mkrhs $2 2, $3)) }
+      { mkstr(Pstr_exception(mkdocrhs $2 2, $3)) }
   | EXCEPTION UIDENT EQUAL constr_longident
-      { mkstr(Pstr_exn_rebind(mkrhs $2 2, mkloc $4 (rhs_loc 4))) }
+      { mkstr(Pstr_exn_rebind(mkdocrhs $2 2, mkloc $4 (rhs_loc 4))) }
   | MODULE UIDENT module_binding
-      { mkstr(Pstr_module(mkrhs $2 2, $3)) }
+      { mkstr(Pstr_module(mkdocrhs $2 2, $3)) }
   | MODULE REC module_rec_bindings
       { mkstr(Pstr_recmodule(List.rev $3)) }
   | MODULE TYPE ident EQUAL module_type
-      { mkstr(Pstr_modtype(mkrhs $3 3, $5)) }
+      { mkstr(Pstr_modtype(mkdocrhs $3 3, $5)) }
   | OPEN mod_longident
       { mkstr(Pstr_open (mkrhs $2 2)) }
   | CLASS class_declarations
@@ -595,7 +597,7 @@ structure_item:
   | CLASS TYPE class_type_declarations
       { mkstr(Pstr_class_type (List.rev $3)) }
   | INCLUDE module_expr
-      { mkstr(Pstr_include $2) }
+      { mkstr(Pstr_include($2, None)) }
 ;
 module_binding:
     EQUAL module_expr
@@ -610,7 +612,7 @@ module_rec_bindings:
   | module_rec_bindings AND module_rec_binding    { $3 :: $1 }
 ;
 module_rec_binding:
-    UIDENT COLON module_type EQUAL module_expr    { (mkrhs $1 1, $3, $5) }
+    UIDENT COLON module_type EQUAL module_expr    { (mkdocrhs $1 1, $3, $5) }
 ;
 
 /* Module types */
@@ -641,27 +643,27 @@ signature:
 ;
 signature_item:
     VAL val_ident COLON core_type
-      { mksig(Psig_value(mkrhs $2 2, {pval_type = $4; pval_prim = [];
+      { mksig(Psig_value(mkdocrhs $2 2, {pval_type = $4; pval_prim = [];
           pval_loc = symbol_rloc()})) }
   | EXTERNAL val_ident COLON core_type EQUAL primitive_declaration
-      { mksig(Psig_value(mkrhs $2 2, {pval_type = $4; pval_prim = $6;
+      { mksig(Psig_value(mkdocrhs $2 2, {pval_type = $4; pval_prim = $6;
           pval_loc = symbol_rloc()})) }
   | TYPE type_declarations
       { mksig(Psig_type(List.rev $2)) }
   | EXCEPTION UIDENT constructor_arguments
-      { mksig(Psig_exception(mkrhs $2 2, $3)) }
+      { mksig(Psig_exception(mkdocrhs $2 2, $3)) }
   | MODULE UIDENT module_declaration
-      { mksig(Psig_module(mkrhs $2 2, $3)) }
+      { mksig(Psig_module(mkdocrhs $2 2, $3)) }
   | MODULE REC module_rec_declarations
       { mksig(Psig_recmodule(List.rev $3)) }
   | MODULE TYPE ident
-      { mksig(Psig_modtype(mkrhs $3 3, Pmodtype_abstract)) }
+      { mksig(Psig_modtype(mkdocrhs $3 3, Pmodtype_abstract)) }
   | MODULE TYPE ident EQUAL module_type
-      { mksig(Psig_modtype(mkrhs $3 3, Pmodtype_manifest $5)) }
+      { mksig(Psig_modtype(mkdocrhs $3 3, Pmodtype_manifest $5)) }
   | OPEN mod_longident
       { mksig(Psig_open (mkrhs $2 2)) }
   | INCLUDE module_type
-      { mksig(Psig_include $2) }
+      { mksig(Psig_include($2, None)) }
   | CLASS class_descriptions
       { mksig(Psig_class (List.rev $2)) }
   | CLASS TYPE class_type_declarations
@@ -679,7 +681,7 @@ module_rec_declarations:
   | module_rec_declarations AND module_rec_declaration  { $3 :: $1 }
 ;
 module_rec_declaration:
-    UIDENT COLON module_type                            { (mkrhs $1 1, $3) }
+    UIDENT COLON module_type                            { (mkdocrhs $1 1, $3) }
 ;
 
 /* Class expressions */
@@ -692,7 +694,7 @@ class_declaration:
     virtual_flag class_type_parameters LIDENT class_fun_binding
       { let params, variance = List.split (fst $2) in
         {pci_virt = $1; pci_params = params, snd $2;
-         pci_name = mkrhs $3 3; pci_expr = $4; pci_variance = variance;
+         pci_name = mkdocrhs $3 3; pci_expr = $4; pci_variance = variance;
          pci_loc = symbol_rloc ()} }
 ;
 class_fun_binding:
@@ -761,7 +763,7 @@ class_fields:
 ;
 class_field:
   | INHERIT override_flag class_expr parent_binder
-      { mkcf (Pcf_inher ($2, $3, $4)) }
+      { mkcf (Pcf_inher ($2, $3, $4, None)) }
   | VAL virtual_value
       { mkcf (Pcf_valvirt $2) }
   | VAL value
@@ -784,33 +786,33 @@ parent_binder:
 virtual_value:
     override_flag MUTABLE VIRTUAL label COLON core_type
       { if $1 = Override then syntax_error ();
-        mkloc $4 (rhs_loc 4), Mutable, $6 }
+        mkdocrhs $4 4, Mutable, $6 }
   | VIRTUAL mutable_flag label COLON core_type
-      { mkrhs $3 3, $2, $5 }
+      { mkdocrhs $3 3, $2, $5 }
 ;
 value:
     override_flag mutable_flag label EQUAL seq_expr
-      { mkrhs $3 3, $2, $1, $5 }
+      { mkdocrhs $3 3, $2, $1, $5 }
   | override_flag mutable_flag label type_constraint EQUAL seq_expr
-      { mkrhs $3 3, $2, $1, (let (t, t') = $4 in ghexp(Pexp_constraint($6, t, t'))) }
+      { mkdocrhs $3 3, $2, $1, (let (t, t') = $4 in ghexp(Pexp_constraint($6, t, t'))) }
 ;
 virtual_method:
     METHOD override_flag PRIVATE VIRTUAL label COLON poly_type
       { if $2 = Override then syntax_error ();
-        mkloc $5 (rhs_loc 5), Private, $7 }
+        mkdocrhs $5 5, Private, $7 }
   | METHOD override_flag VIRTUAL private_flag label COLON poly_type
       { if $2 = Override then syntax_error ();
-        mkloc $5 (rhs_loc 5), $4, $7 }
+        mkdocrhs $5 5, $4, $7 }
 ;
 concrete_method :
     METHOD override_flag private_flag label strict_binding
-      { mkloc $4 (rhs_loc 4), $3, $2, ghexp(Pexp_poly ($5, None)) }
+      { mkdocrhs $4 4, $3, $2, ghexp(Pexp_poly ($5, None)) }
   | METHOD override_flag private_flag label COLON poly_type EQUAL seq_expr
-      { mkloc $4 (rhs_loc 4), $3, $2, ghexp(Pexp_poly($8,Some $6)) }
+      { mkdocrhs $4 4, $3, $2, ghexp(Pexp_poly($8,Some $6)) }
   | METHOD override_flag private_flag label COLON TYPE lident_list
     DOT core_type EQUAL seq_expr
       { let exp, poly = wrap_type_annotation $7 $9 $11 in
-        mkloc $4 (rhs_loc 4), $3, $2, ghexp(Pexp_poly(exp, Some poly)) }
+        mkdocrhs $4 4, $3, $2, ghexp(Pexp_poly(exp, Some poly)) }
 ;
 
 /* Class types */
@@ -891,7 +893,7 @@ class_description:
     virtual_flag class_type_parameters LIDENT COLON class_type
       { let params, variance = List.split (fst $2) in
         {pci_virt = $1; pci_params = params, snd $2;
-         pci_name = mkrhs $3 3; pci_expr = $5; pci_variance = variance;
+         pci_name = mkdocrhs $3 3; pci_expr = $5; pci_variance = variance;
          pci_loc = symbol_rloc ()} }
 ;
 class_type_declarations:
@@ -902,7 +904,7 @@ class_type_declaration:
     virtual_flag class_type_parameters LIDENT EQUAL class_signature
       { let params, variance = List.split (fst $2) in
         {pci_virt = $1; pci_params = params, snd $2;
-         pci_name = mkrhs $3 3; pci_expr = $5; pci_variance = variance;
+         pci_name = mkdocrhs $3 3; pci_expr = $5; pci_variance = variance;
          pci_loc = symbol_rloc ()} }
 ;
 
@@ -1361,7 +1363,7 @@ type_declaration:
     optional_type_parameters LIDENT type_kind constraints
       { let (params, variance) = List.split $1 in
         let (kind, private_flag, manifest) = $3 in
-        (mkrhs $2 2, {ptype_params = params;
+        (mkdocrhs $2 2, {ptype_params = params;
               ptype_cstrs = List.rev $4;
               ptype_kind = kind;
               ptype_private = private_flag;
@@ -1434,7 +1436,7 @@ constructor_declaration:
 
   | constr_ident generalized_constructor_arguments
       { let arg_types,ret_type = $2 in
-        (mkrhs $1 1, arg_types,ret_type, symbol_rloc()) }
+        (mkrhs $1 1, arg_types,ret_type, symbol_rloc(), None) }
 ;
 
 constructor_arguments:
@@ -1457,7 +1459,7 @@ label_declarations:
   | label_declarations SEMI label_declaration   { $3 :: $1 }
 ;
 label_declaration:
-    mutable_flag label COLON poly_type          { (mkrhs $2 2, $1, $4, symbol_rloc()) }
+    mutable_flag label COLON poly_type          { (mkrhs $2 2, $1, $4, symbol_rloc(), None) }
 ;
 
 /* "with" constraints (additional type equations over signature components) */
