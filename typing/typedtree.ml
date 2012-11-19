@@ -145,16 +145,17 @@ and class_field_kind =
 and class_field_desc =
     Tcf_inher of
       override_flag * class_expr * string option * (string * Ident.t) list *
-        (string * Ident.t) list
+        (string * Ident.t) list * Info.comment
     (* Inherited instance variables and concrete methods *)
   | Tcf_val of
-      string * string loc * mutable_flag * Ident.t * class_field_kind * bool
+      string * string doc * mutable_flag * Ident.t * class_field_kind * bool
         (* None = virtual, true = override *)
-  | Tcf_meth of string * string loc * private_flag * class_field_kind * bool
+  | Tcf_meth of string * string doc * private_flag * class_field_kind * bool
   | Tcf_constr of core_type * core_type
 (*  | Tcf_let of rec_flag * (pattern * expression) list *
               (Ident.t * string loc * expression) list *)
   | Tcf_init of expression
+  | Tcf_comment of Info.comment
 
 (* Value expressions for the module language *)
 
@@ -191,18 +192,19 @@ and structure_item =
 
 and structure_item_desc =
     Tstr_eval of expression
-  | Tstr_value of rec_flag * (pattern * expression) list
-  | Tstr_primitive of Ident.t * string loc * value_description
-  | Tstr_type of (Ident.t * string loc * type_declaration) list
-  | Tstr_exception of Ident.t * string loc * exception_declaration
-  | Tstr_exn_rebind of Ident.t * string loc * Path.t * Longident.t loc
-  | Tstr_module of Ident.t * string loc * module_expr
-  | Tstr_recmodule of (Ident.t * string loc * module_type * module_expr) list
-  | Tstr_modtype of Ident.t * string loc * module_type
+  | Tstr_value of rec_flag * ((pattern * expression) * Info.info) list
+  | Tstr_primitive of Ident.t * string doc * value_description
+  | Tstr_type of (Ident.t * string doc * type_declaration) list
+  | Tstr_exception of Ident.t * string doc * exception_declaration
+  | Tstr_exn_rebind of Ident.t * string doc * Path.t * Longident.t loc
+  | Tstr_module of Ident.t * string doc * module_expr
+  | Tstr_recmodule of (Ident.t * string doc * module_type * module_expr) list
+  | Tstr_modtype of Ident.t * string doc * module_type
   | Tstr_open of Path.t * Longident.t loc
   | Tstr_class of (class_declaration * string list * virtual_flag) list
-  | Tstr_class_type of (Ident.t * string loc * class_type_declaration) list
-  | Tstr_include of module_expr * Ident.t list
+  | Tstr_class_type of (Ident.t * string doc * class_type_declaration) list
+  | Tstr_include of module_expr * Ident.t list * Info.info
+  | Tstr_comment of Info.comment
 
 and module_coercion =
     Tcoerce_none
@@ -235,16 +237,17 @@ and signature_item =
     sig_loc: Location.t }
 
 and signature_item_desc =
-    Tsig_value of Ident.t * string loc * value_description
-  | Tsig_type of (Ident.t * string loc * type_declaration) list
-  | Tsig_exception of Ident.t * string loc * exception_declaration
-  | Tsig_module of Ident.t * string loc * module_type
-  | Tsig_recmodule of (Ident.t * string loc * module_type) list
-  | Tsig_modtype of Ident.t * string loc * modtype_declaration
+    Tsig_value of Ident.t * string doc * value_description
+  | Tsig_type of (Ident.t * string doc * type_declaration) list
+  | Tsig_exception of Ident.t * string doc * exception_declaration
+  | Tsig_module of Ident.t * string doc * module_type
+  | Tsig_recmodule of (Ident.t * string doc * module_type) list
+  | Tsig_modtype of Ident.t * string doc * modtype_declaration
   | Tsig_open of Path.t * Longident.t loc
-  | Tsig_include of module_type * Types.signature
+  | Tsig_include of module_type * Types.signature * Info.info
   | Tsig_class of class_description list
   | Tsig_class_type of class_type_declaration list
+  | Tsig_comment of Info.comment
 
 and modtype_declaration =
     Tmodtype_abstract
@@ -314,9 +317,9 @@ and type_declaration =
 
 and type_kind =
     Ttype_abstract
-  | Ttype_variant of (Ident.t * string loc * core_type list * Location.t) list
+  | Ttype_variant of (Ident.t * string loc * core_type list * Location.t * Info.comment) list
   | Ttype_record of
-      (Ident.t * string loc * mutable_flag * core_type * Location.t) list
+      (Ident.t * string loc * mutable_flag * core_type * Location.t * Info.comment) list
 
 and exception_declaration =
   { exn_params : core_type list;
@@ -365,7 +368,7 @@ and class_type_declaration =
 and 'a class_infos =
   { ci_virt: virtual_flag;
     ci_params: string loc list * Location.t;
-    ci_id_name : string loc;
+    ci_id_name : string doc;
     ci_id_class: Ident.t;
     ci_id_class_type : Ident.t;
     ci_id_object : Ident.t;
@@ -461,3 +464,4 @@ let rec alpha_pat env p = match p.pat_desc with
 
 let mkloc = Location.mkloc
 let mknoloc = Location.mknoloc
+let mkdoc = Info.mkdoc
