@@ -22,7 +22,7 @@ let tracer =
 
     method! structure_item = function
       | {pstr_desc = Pstr_module (s, _); pstr_loc = _loc} as si ->
-          [ M.map_structure_item {< path = path ^ "." ^ s.txt >} si ]
+          [ M.map_structure_item {< path = path ^ "." ^ s.dtxt >} si ]
       | si ->
           [ M.map_structure_item this si ]
 

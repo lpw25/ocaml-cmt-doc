@@ -21,7 +21,7 @@ let structure sub str =
 let structure_item sub x =
   match x.str_desc with
   | Tstr_eval exp -> sub # expression exp
-  | Tstr_value (rec_flag, list) -> sub # bindings (rec_flag, list)
+  | Tstr_value (rec_flag, list) -> sub # bindings (rec_flag, List.map fst list)
   | Tstr_primitive (id, _, v) -> sub # value_description v
   | Tstr_type list ->
       List.iter (fun (id, _, decl) -> sub # type_declaration decl) list
@@ -41,7 +41,8 @@ let structure_item sub x =
       List.iter (fun (ci, _, _) -> sub # class_expr ci.ci_expr) list
   | Tstr_class_type list ->
       List.iter (fun (id, _, ct) -> sub # class_type ct.ci_expr) list
-  | Tstr_include (mexpr, _) -> sub # module_expr mexpr
+  | Tstr_include (mexpr, _, _) -> sub # module_expr mexpr
+  | Tstr_comment _ -> ()
 
 let value_description sub x =
   sub # core_type x.val_desc
@@ -53,9 +54,9 @@ let type_declaration sub decl =
   begin match decl.typ_kind with
   | Ttype_abstract -> ()
   | Ttype_variant list ->
-      List.iter (fun (s, _, cts, loc) -> List.iter (sub # core_type) cts) list
+      List.iter (fun (s, _, cts, loc, com) -> List.iter (sub # core_type) cts) list
   | Ttype_record list ->
-      List.iter (fun (s, _, mut, ct, loc) -> sub # core_type ct) list
+      List.iter (fun (s, _, mut, ct, loc, com) -> sub # core_type ct) list
   end;
   opt (sub # core_type) decl.typ_manifest
 
@@ -183,11 +184,12 @@ let signature_item sub item =
   | Tsig_modtype (id, _, mdecl) ->
       sub # modtype_declaration mdecl
   | Tsig_open _ -> ()
-  | Tsig_include (mty,_) -> sub # module_type mty
+  | Tsig_include (mty, _, _) -> sub # module_type mty
   | Tsig_class list ->
       List.iter (sub # class_description) list
   | Tsig_class_type list ->
       List.iter (sub # class_type_declaration) list
+  | Tsig_comment _ -> ()
 
 let modtype_declaration sub mdecl =
   match mdecl with
@@ -322,7 +324,7 @@ let row_field sub rf =
 
 let class_field sub cf =
   match cf.cf_desc with
-  | Tcf_inher (ovf, cl, super, _vals, _meths) ->
+  | Tcf_inher (ovf, cl, super, _vals, _meths,  com) ->
       sub # class_expr cl
   | Tcf_constr (cty, cty') ->
       sub # core_type cty;
@@ -337,6 +339,7 @@ let class_field sub cf =
       sub # expression exp
   | Tcf_init exp ->
       sub # expression exp
+  | Tcf_comment com -> ()
 
 let bindings sub (rec_flag, list) =
   List.iter (sub # binding) list

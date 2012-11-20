@@ -672,6 +672,7 @@ let camlp4_import_list =
      "utils/terminfo.ml";
      "utils/warnings.ml";
      "parsing/location.ml";
+     "parsing/info.ml";
      "parsing/longident.ml";
      "parsing/asttypes.mli";
      "parsing/parsetree.mli";

@@ -43,6 +43,10 @@ module Location =struct
   include Location
   let eq_t : (t*t) -> bool = fun (_,_) -> true
 end
+module Info = struct
+  include Info
+  let eq_info : (info * info) -> bool = fun (_,_) -> true
+  let eq_comment : (comment * comment) -> bool = fun (_,_) -> true
 module Longident = struct
   include Longident
   let rec eq_t : (t * t) -> 'result =
@@ -120,7 +124,13 @@ module Asttypes = struct
         (('all_a0 loc) * ('all_a0 loc)) -> 'result =
     fun mf_a ({ txt = a0; loc = a1 }, { txt = b0; loc = b1 }) ->
       (mf_a (a0, b0)) && (Location.eq_t (a1, b1))
-    
+  
+  let  eq_doc :
+    'all_a0.
+      (('all_a0 * 'all_a0) -> 'result) ->
+        (('all_a0 doc) * ('all_a0 doc)) -> 'result =
+    fun mf_a ({ dtxt = a0; dloc = a1; info = a2 }, { dtxt = b0; dloc = b1; info = b2 }) ->
+      (mf_a (a0, b0)) && (Location.eq_t (a1, b1)) && (Info.eq_info (a2, b2))
 end
 
 let rec eq_row_field : (row_field * row_field) -> 'result =
@@ -213,7 +223,7 @@ let eq_class_infos :
               (eq_list (Asttypes.eq_loc eq_string) (a0, b0)) &&
                 (Location.eq_t (a1, b1)))
              (a1, b1)))
-         && (Asttypes.eq_loc eq_string (a2, b2)))
+         && (Asttypes.eq_doc eq_string (a2, b2)))
         && (mf_a (a3, b3)))
        &&
        (eq_list
@@ -268,36 +278,38 @@ let rec eq_structure_item_desc :
   | (Pstr_value (a0, a1), Pstr_value (b0, b1)) ->
       (Asttypes.eq_rec_flag (a0, b0)) &&
         (eq_list
-           (fun ((a0, a1), (b0, b1)) ->
-              (eq_pattern (a0, b0)) && (eq_expression (a1, b1)))
+           (fun ((a0, a1), a2), ((b0, b1), b2)) ->
+              (eq_pattern (a0, b0)) && 
+                (eq_expression (a1, b1))
+               && (Info.eq_info (a2, b2)))
            (a1, b1))
   | (Pstr_primitive (a0, a1), Pstr_primitive (b0, b1)) ->
-      (Asttypes.eq_loc eq_string (a0, b0)) &&
+      (Asttypes.eq_doc eq_string (a0, b0)) &&
         (eq_value_description (a1, b1))
   | (Pstr_type a0, Pstr_type b0) ->
       eq_list
         (fun ((a0, a1), (b0, b1)) ->
-           (Asttypes.eq_loc eq_string (a0, b0)) &&
+           (Asttypes.eq_doc eq_string (a0, b0)) &&
              (eq_type_declaration (a1, b1)))
         (a0, b0)
   | (Pstr_exception (a0, a1), Pstr_exception (b0, b1)) ->
-      (Asttypes.eq_loc eq_string (a0, b0)) &&
+      (Asttypes.eq_doc eq_string (a0, b0)) &&
         (eq_exception_declaration (a1, b1))
   | (Pstr_exn_rebind (a0, a1), Pstr_exn_rebind (b0, b1)) ->
-      (Asttypes.eq_loc eq_string (a0, b0)) &&
+      (Asttypes.eq_doc eq_string (a0, b0)) &&
         (Asttypes.eq_loc Longident.eq_t (a1, b1))
   | (Pstr_module (a0, a1), Pstr_module (b0, b1)) ->
-      (Asttypes.eq_loc eq_string (a0, b0)) &&
+      (Asttypes.eq_doc eq_string (a0, b0)) &&
         (eq_module_expr (a1, b1))
   | (Pstr_recmodule a0, Pstr_recmodule b0) ->
       eq_list
         (fun ((a0, a1, a2), (b0, b1, b2)) ->
-           ((Asttypes.eq_loc eq_string (a0, b0)) &&
+           ((Asttypes.eq_doc eq_string (a0, b0)) &&
               (eq_module_type (a1, b1)))
              && (eq_module_expr (a2, b2)))
         (a0, b0)
   | (Pstr_modtype (a0, a1), Pstr_modtype (b0, b1)) ->
-      (Asttypes.eq_loc eq_string (a0, b0)) &&
+      (Asttypes.eq_doc eq_string (a0, b0)) &&
         (eq_module_type (a1, b1))
   | (Pstr_open a0, Pstr_open b0) ->
       Asttypes.eq_loc Longident.eq_t (a0, b0)
@@ -305,7 +317,11 @@ let rec eq_structure_item_desc :
       eq_list eq_class_declaration (a0, b0)
   | (Pstr_class_type a0, Pstr_class_type b0) ->
       eq_list eq_class_type_declaration (a0, b0)
-  | (Pstr_include a0, Pstr_include b0) -> eq_module_expr (a0, b0)
+  | (Pstr_include (a0, a1), Pstr_include (b0, b1)) -> 
+      (eq_module_expr (a0, b0)) &&
+        (Info.eq_info (a1, b1))
+  | (Pstr_comment a0, Pstr_comment b0) ->
+      Info.eq_comment (a0, b0)
   | (_, _) -> false
 and eq_structure_item :
   (structure_item * structure_item) -> 'result =
@@ -358,36 +374,40 @@ and eq_signature_item_desc :
   (signature_item_desc * signature_item_desc) -> 'result =
   function
   | (Psig_value (a0, a1), Psig_value (b0, b1)) ->
-      (Asttypes.eq_loc eq_string (a0, b0)) &&
+      (Asttypes.eq_doc eq_string (a0, b0)) &&
         (eq_value_description (a1, b1))
   | (Psig_type a0, Psig_type b0) ->
       eq_list
         (fun ((a0, a1), (b0, b1)) ->
-           (Asttypes.eq_loc eq_string (a0, b0)) &&
+           (Asttypes.eq_doc eq_string (a0, b0)) &&
              (eq_type_declaration (a1, b1)))
         (a0, b0)
   | (Psig_exception (a0, a1), Psig_exception (b0, b1)) ->
-      (Asttypes.eq_loc eq_string (a0, b0)) &&
+      (Asttypes.eq_doc eq_string (a0, b0)) &&
         (eq_exception_declaration (a1, b1))
   | (Psig_module (a0, a1), Psig_module (b0, b1)) ->
-      (Asttypes.eq_loc eq_string (a0, b0)) &&
+      (Asttypes.eq_doc eq_string (a0, b0)) &&
         (eq_module_type (a1, b1))
   | (Psig_recmodule a0, Psig_recmodule b0) ->
       eq_list
         (fun ((a0, a1), (b0, b1)) ->
-           (Asttypes.eq_loc eq_string (a0, b0)) &&
+           (Asttypes.eq_doc eq_string (a0, b0)) &&
              (eq_module_type (a1, b1)))
         (a0, b0)
   | (Psig_modtype (a0, a1), Psig_modtype (b0, b1)) ->
-      (Asttypes.eq_loc eq_string (a0, b0)) &&
+      (Asttypes.eq_doc eq_string (a0, b0)) &&
         (eq_modtype_declaration (a1, b1))
   | (Psig_open a0, Psig_open b0) ->
       Asttypes.eq_loc Longident.eq_t (a0, b0)
-  | (Psig_include a0, Psig_include b0) -> eq_module_type (a0, b0)
+  | (Psig_include (a0, a1), Psig_include (b0, b1)) -> 
+      (eq_module_type (a0, b0)) &&
+        (Doc.eq_info (a1, b1))
   | (Psig_class a0, Psig_class b0) ->
       eq_list eq_class_description (a0, b0)
   | (Psig_class_type a0, Psig_class_type b0) ->
       eq_list eq_class_type_declaration (a0, b0)
+  | (Psig_comment a0, Psig_comment b0) ->
+      Doc.eq_comment (a0, b0)
   | (_, _) -> false
 and eq_signature_item :
   (signature_item * signature_item) -> 'result =
@@ -427,32 +447,33 @@ and eq_class_declaration :
 and eq_class_field_desc :
   (class_field_desc * class_field_desc) -> 'result =
   function
-  | (Pcf_inher (a0, a1, a2), Pcf_inher (b0, b1, b2)) ->
+  | (Pcf_inher (a0, a1, a2, a3), Pcf_inher (b0, b1, b2, b3)) ->
       ((Asttypes.eq_override_flag (a0, b0)) &&
          (eq_class_expr (a1, b1)))
         && (eq_option eq_string (a2, b2))
+        && (Info.eq_comment (a3, b3))
   | (Pcf_valvirt a0, Pcf_valvirt b0) ->
       (fun ((a0, a1, a2), (b0, b1, b2)) ->
-         ((Asttypes.eq_loc eq_string (a0, b0)) &&
+         ((Asttypes.eq_doc eq_string (a0, b0)) &&
             (Asttypes.eq_mutable_flag (a1, b1)))
            && (eq_core_type (a2, b2)))
         (a0, b0)
   | (Pcf_val a0, Pcf_val b0) ->
       (fun ((a0, a1, a2, a3), (b0, b1, b2, b3)) ->
-         (((Asttypes.eq_loc eq_string (a0, b0)) &&
+         (((Asttypes.eq_doc eq_string (a0, b0)) &&
              (Asttypes.eq_mutable_flag (a1, b1)))
             && (Asttypes.eq_override_flag (a2, b2)))
            && (eq_expression (a3, b3)))
         (a0, b0)
   | (Pcf_virt a0, Pcf_virt b0) ->
       (fun ((a0, a1, a2), (b0, b1, b2)) ->
-         ((Asttypes.eq_loc eq_string (a0, b0)) &&
+         ((Asttypes.eq_doc eq_string (a0, b0)) &&
             (Asttypes.eq_private_flag (a1, b1)))
            && (eq_core_type (a2, b2)))
         (a0, b0)
   | (Pcf_meth a0, Pcf_meth b0) ->
       (fun ((a0, a1, a2, a3), (b0, b1, b2, b3)) ->
-         (((Asttypes.eq_loc eq_string (a0, b0)) &&
+         (((Asttypes.eq_doc eq_string (a0, b0)) &&
              (Asttypes.eq_private_flag (a1, b1)))
             && (Asttypes.eq_override_flag (a2, b2)))
            && (eq_expression (a3, b3)))
@@ -462,6 +483,7 @@ and eq_class_field_desc :
          (eq_core_type (a0, b0)) && (eq_core_type (a1, b1)))
         (a0, b0)
   | (Pcf_init a0, Pcf_init b0) -> eq_expression (a0, b0)
+  | (Pcf_comment a0, Pcf_comment b0) -> Info.eq_comment (a0, b0)
   | (_, _) -> false
 and eq_class_field : (class_field * class_field) -> 'result =
   fun
@@ -582,19 +604,21 @@ and eq_type_kind : (type_kind * type_kind) -> 'result =
   | (Ptype_abstract, Ptype_abstract) -> true
   | (Ptype_variant a0, Ptype_variant b0) ->
       eq_list
-        (fun ((a0, a1, a2, a3), (b0, b1, b2, b3)) ->
+        (fun ((a0, a1, a2, a3, a4), (b0, b1, b2, b3, b4)) ->
            (((Asttypes.eq_loc eq_string (a0, b0)) &&
                (eq_list eq_core_type (a1, b1)))
               && (eq_option eq_core_type (a2, b2)))
-             && (Location.eq_t (a3, b3)))
+             && (Location.eq_t (a3, b3))
+             && (Info.eq_comment (a4, b4)))
         (a0, b0)
   | (Ptype_record a0, Ptype_record b0) ->
       eq_list
-        (fun ((a0, a1, a2, a3), (b0, b1, b2, b3)) ->
+        (fun ((a0, a1, a2, a3, a4), (b0, b1, b2, b3, b4)) ->
            (((Asttypes.eq_loc eq_string (a0, b0)) &&
                (Asttypes.eq_mutable_flag (a1, b1)))
               && (eq_core_type (a2, b2)))
-             && (Location.eq_t (a3, b3)))
+             && (Location.eq_t (a3, b3))
+             && (Info.eq_comment (a4, b4)))
         (a0, b0)
   | (_, _) -> false
 and eq_type_declaration :

@@ -78,9 +78,9 @@ let add_type_declaration bv td =
   let rec add_tkind = function
     Ptype_abstract -> ()
   | Ptype_variant cstrs ->
-      List.iter (fun (c, args, rty, _) -> List.iter (add_type bv) args; Misc.may (add_type bv) rty) cstrs
+      List.iter (fun (c, args, rty, _, _) -> List.iter (add_type bv) args; Misc.may (add_type bv) rty) cstrs
   | Ptype_record lbls ->
-      List.iter (fun (l, mut, ty, _) -> add_type bv ty) lbls in
+      List.iter (fun (l, mut, ty, _, _) -> add_type bv ty) lbls in
   add_tkind td.ptype_kind
 
 let rec add_class_type bv cty =
@@ -217,9 +217,9 @@ and add_sig_item bv item =
   | Psig_exception(id, args) ->
       List.iter (add_type bv) args; bv
   | Psig_module(id, mty) ->
-      add_modtype bv mty; StringSet.add id.txt bv
+      add_modtype bv mty; StringSet.add id.dtxt bv
   | Psig_recmodule decls ->
-      let bv' = List.fold_right StringSet.add (List.map (fun (x,_) -> x.txt) decls) bv in
+      let bv' = List.fold_right StringSet.add (List.map (fun (x,_) -> x.dtxt) decls) bv in
       List.iter (fun (id, mty) -> add_modtype bv' mty) decls;
       bv'
   | Psig_modtype(id,mtyd) ->
@@ -230,12 +230,13 @@ and add_sig_item bv item =
       bv
   | Psig_open lid ->
       addmodule bv lid; bv
-  | Psig_include mty ->
+  | Psig_include(mty,info) ->
       add_modtype bv mty; bv
   | Psig_class cdl ->
       List.iter (add_class_description bv) cdl; bv
   | Psig_class_type cdtl ->
       List.iter (add_class_type_declaration bv) cdtl; bv
+  | Psig_comment com -> bv
 
 and add_module bv modl =
   match modl.pmod_desc with
@@ -259,7 +260,7 @@ and add_struct_item bv item =
     Pstr_eval e ->
       add_expr bv e; bv
   | Pstr_value(rf, pel) ->
-      let bv = add_bindings rf bv pel in bv
+      let bv = add_bindings rf bv (List.map fst pel) in bv
   | Pstr_primitive(id, vd) ->
       add_type bv vd.pval_type; bv
   | Pstr_type dcls ->
@@ -269,11 +270,11 @@ and add_struct_item bv item =
   | Pstr_exn_rebind(id, l) ->
       add bv l; bv
   | Pstr_module(id, modl) ->
-      add_module bv modl; StringSet.add id.txt bv
+      add_module bv modl; StringSet.add id.dtxt bv
   | Pstr_recmodule bindings ->
       let bv' =
         List.fold_right StringSet.add
-          (List.map (fun (id,_,_) -> id.txt) bindings) bv in
+          (List.map (fun (id,_,_) -> id.dtxt) bindings) bv in
       List.iter
         (fun (id, mty, modl) -> add_modtype bv' mty; add_module bv' modl)
         bindings;
@@ -286,8 +287,9 @@ and add_struct_item bv item =
       List.iter (add_class_declaration bv) cdl; bv
   | Pstr_class_type cdtl ->
       List.iter (add_class_type_declaration bv) cdtl; bv
-  | Pstr_include modl ->
+  | Pstr_include(modl, info) ->
       add_module bv modl; bv
+  | Pstr_comment com -> bv
 
 and add_use_file bv top_phrs =
   ignore (List.fold_left add_top_phrase bv top_phrs)
@@ -317,13 +319,14 @@ and add_class_expr bv ce =
 
 and add_class_field bv pcf =
   match pcf.pcf_desc with
-    Pcf_inher(_, ce, _) -> add_class_expr bv ce
+    Pcf_inher(_, ce, _, _) -> add_class_expr bv ce
   | Pcf_val(_, _, _, e) -> add_expr bv e
   | Pcf_valvirt(_, _, ty)
   | Pcf_virt(_, _, ty) -> add_type bv ty
   | Pcf_meth(_, _, _, e) -> add_expr bv e
   | Pcf_constr(ty1, ty2) -> add_type bv ty1; add_type bv ty2
   | Pcf_init e -> add_expr bv e
+  | Pcf_comment _ -> ()
 
 and add_class_declaration bv decl =
   add_class_expr bv decl.pci_expr

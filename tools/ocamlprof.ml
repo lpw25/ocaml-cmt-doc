@@ -319,7 +319,7 @@ and rewrite_trymatching l =
 
 and rewrite_class_field iflag cf =
   match cf.pcf_desc with
-    Pcf_inher (_, cexpr, _)     -> rewrite_class_expr iflag cexpr
+    Pcf_inher (_, cexpr, _, _)     -> rewrite_class_expr iflag cexpr
   | Pcf_val (_, _, _, sexp)  -> rewrite_exp iflag sexp
   | Pcf_meth (_, _, _, ({pexp_desc = Pexp_function _} as sexp)) ->
       rewrite_exp iflag sexp
@@ -329,7 +329,7 @@ and rewrite_class_field iflag cf =
       else rewrite_exp iflag sexp
   | Pcf_init sexp ->
       rewrite_exp iflag sexp
-  | Pcf_valvirt _ | Pcf_virt _ | Pcf_constr _  -> ()
+  | Pcf_valvirt _ | Pcf_virt _ | Pcf_constr _ | Pcf_comment _ -> ()
 
 and rewrite_class_expr iflag cexpr =
   match cexpr.pcl_desc with
@@ -365,7 +365,7 @@ and rewrite_str_item iflag item =
   match item.pstr_desc with
     Pstr_eval exp -> rewrite_exp iflag exp
   | Pstr_value(_, exps)
-     -> List.iter (function (_,exp) -> rewrite_exp iflag exp) exps
+     -> List.iter (function ((_,exp),_) -> rewrite_exp iflag exp) exps
   | Pstr_module(name, smod) -> rewrite_mod iflag smod
   | Pstr_class classes -> List.iter (rewrite_class_declaration iflag) classes
   | _ -> ()

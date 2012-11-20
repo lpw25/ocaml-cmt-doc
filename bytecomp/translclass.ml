@@ -126,7 +126,7 @@ let rec build_object_init cl_table obj params inh_init obj_init cl =
           List.fold_right
             (fun field (inh_init, obj_init, has_init) ->
                match field.cf_desc with
-                 Tcf_inher (_, cl, _, _, _) ->
+                 Tcf_inher (_, cl, _, _, _, _) ->
                    let (inh_init, obj_init') =
                      build_object_init cl_table (Lvar obj) [] inh_init
                        (fun _ -> lambda_unit) cl
@@ -135,7 +135,7 @@ let rec build_object_init cl_table obj params inh_init obj_init cl =
                | Tcf_val (_, _, _, id, Tcfk_concrete exp, _) ->
                    (inh_init, lsequence (set_inst_var obj id exp) obj_init,
                     has_init)
-               | Tcf_meth _ | Tcf_val _ | Tcf_constr _ ->
+               | Tcf_meth _ | Tcf_val _ | Tcf_constr _ | Tcf_comment _ ->
                    (inh_init, obj_init, has_init)
                | Tcf_init _ ->
                    (inh_init, obj_init, true)
@@ -262,7 +262,7 @@ let rec build_class_init cla cstr super inh_init cl_init msubst top cl =
         List.fold_right
           (fun field (inh_init, cl_init, methods, values) ->
             match field.cf_desc with
-              Tcf_inher (_, cl, _, vals, meths) ->
+              Tcf_inher (_, cl, _, vals, meths, _) ->
                 let cl_init = output_methods cla methods cl_init in
                 let inh_init, cl_init =
                   build_class_init cla false
@@ -274,6 +274,7 @@ let rec build_class_init cla cstr super inh_init cl_init msubst top cl =
                 (inh_init, cl_init, methods, values)
             | Tcf_meth (_, _, _, Tcfk_virtual _, _)
             | Tcf_constr _
+            | Tcf_comment _
               ->
                 (inh_init, cl_init, methods, values)
             | Tcf_meth (name, _, _, Tcfk_concrete exp, over) ->

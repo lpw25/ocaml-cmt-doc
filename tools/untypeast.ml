@@ -46,8 +46,8 @@ and untype_structure_item item =
     match item.str_desc with
       Tstr_eval exp -> Pstr_eval (untype_expression exp)
     | Tstr_value (rec_flag, list) ->
-        Pstr_value (rec_flag, List.map (fun (pat, exp) ->
-              untype_pattern pat, untype_expression exp) list)
+        Pstr_value (rec_flag, List.map (fun ((pat, exp), info) ->
+              (untype_pattern pat, untype_expression exp), info) list)
     | Tstr_primitive (id, name, v) ->
         Pstr_primitive (name, untype_value_description v)
     | Tstr_type list ->
@@ -87,8 +87,9 @@ and untype_structure_item item =
                 pci_loc = ct.ci_loc;
               }
           ) list)
-    | Tstr_include (mexpr, _) ->
-        Pstr_include (untype_module_expr mexpr)
+    | Tstr_include (mexpr, _, info) ->
+        Pstr_include (untype_module_expr mexpr, info)
+    | Tstr_comment com -> Pstr_comment com
   in
   { pstr_desc = desc; pstr_loc = item.str_loc; }
 
@@ -108,12 +109,12 @@ and untype_type_declaration decl =
     ptype_kind = (match decl.typ_kind with
         Ttype_abstract -> Ptype_abstract
       | Ttype_variant list ->
-          Ptype_variant (List.map (fun (s, name, cts, loc) ->
-                (name, List.map untype_core_type cts, None, loc)
+          Ptype_variant (List.map (fun (s, name, cts, loc, com) ->
+                (name, List.map untype_core_type cts, None, loc, com)
             ) list)
       | Ttype_record list ->
-          Ptype_record (List.map (fun (s, name, mut, ct, loc) ->
-                (name, mut, untype_core_type ct, loc)
+          Ptype_record (List.map (fun (s, name, mut, ct, loc, com) ->
+                (name, mut, untype_core_type ct, loc, com)
             ) list)
     );
     ptype_private = decl.typ_private;
@@ -319,11 +320,12 @@ and untype_signature_item item =
     | Tsig_modtype (id, name, mdecl) ->
         Psig_modtype (name, untype_modtype_declaration mdecl)
     | Tsig_open (path, lid) -> Psig_open (lid)
-    | Tsig_include (mty, lid) -> Psig_include (untype_module_type mty)
+    | Tsig_include (mty, lid, info) -> Psig_include (untype_module_type mty, info)
     | Tsig_class list ->
         Psig_class (List.map untype_class_description list)
     | Tsig_class_type list ->
         Psig_class_type (List.map untype_class_type_declaration list)
+    | Tsig_comment com -> Psig_comment com
   in
   { psig_desc = desc;
     psig_loc = item.sig_loc;
@@ -521,8 +523,8 @@ and untype_row_field rf =
 
 and untype_class_field cf =
   let desc = match cf.cf_desc with
-      Tcf_inher (ovf, cl, super, _vals, _meths) ->
-        Pcf_inher (ovf, untype_class_expr cl, super)
+      Tcf_inher (ovf, cl, super, _vals, _meths, com) ->
+        Pcf_inher (ovf, untype_class_expr cl, super, com)
     | Tcf_constr (cty, cty') ->
         Pcf_constr (untype_core_type cty, untype_core_type cty')
     | Tcf_val (lab, name, mut, _, Tcfk_virtual cty, override) ->
@@ -542,5 +544,6 @@ and untype_class_field cf =
               untype_pattern pat, untype_expression exp) bindings)
 *)
   | Tcf_init exp -> Pcf_init (untype_expression exp)
+  | Tcf_comment com -> Pcf_comment com
   in
   { pcf_desc = desc; pcf_loc = cf.cf_loc }

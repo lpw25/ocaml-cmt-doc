@@ -14169,6 +14169,9 @@ module Struct =
             let with_loc txt loc =
               Camlp4_import.Location.mkloc txt (mkloc loc)
               
+            let with_doc txt loc =
+              Camlp4_import.Info.mkdoc txt (mkloc loc) None
+              
             let mktyp loc d = { ptyp_desc = d; ptyp_loc = mkloc loc; }
               
             let mkpat loc d = { ppat_desc = d; ppat_loc = mkloc loc; }
@@ -14495,27 +14498,27 @@ module Struct =
               | Ast.TyCol (loc, (Ast.TyId (_, (Ast.IdLid (sloc, s)))),
                   (Ast.TyMut (_, t))) ->
                   ((with_loc s sloc), Mutable, (mkpolytype (ctyp t)),
-                   (mkloc loc))
+                   (mkloc loc), None)
               | Ast.TyCol (loc, (Ast.TyId (_, (Ast.IdLid (sloc, s)))), t) ->
                   ((with_loc s sloc), Immutable, (mkpolytype (ctyp t)),
-                   (mkloc loc))
+                   (mkloc loc), None)
               | _ -> assert false
               
             let mkvariant =
               function
               | Ast.TyId (loc, (Ast.IdUid (sloc, s))) ->
-                  ((with_loc (conv_con s) sloc), [], None, (mkloc loc))
+                  ((with_loc (conv_con s) sloc), [], None, (mkloc loc), None)
               | Ast.TyOf (loc, (Ast.TyId (_, (Ast.IdUid (sloc, s)))), t) ->
                   ((with_loc (conv_con s) sloc),
-                   (List.map ctyp (list_of_ctyp t [])), None, (mkloc loc))
+                   (List.map ctyp (list_of_ctyp t [])), None, (mkloc loc), None)
               | Ast.TyCol (loc, (Ast.TyId (_, (Ast.IdUid (sloc, s)))),
                   (Ast.TyArr (_, t, u))) ->
                   ((with_loc (conv_con s) sloc),
                    (List.map ctyp (list_of_ctyp t [])), (Some (ctyp u)),
-                   (mkloc loc))
+                   (mkloc loc), None)
               | Ast.TyCol (loc, (Ast.TyId (_, (Ast.IdUid (sloc, s)))), t) ->
                   ((with_loc (conv_con s) sloc), [], (Some (ctyp t)),
-                   (mkloc loc))
+                   (mkloc loc), None)
               | _ -> assert false
               
             let rec type_decl tl cl loc m pflag =
@@ -15274,7 +15277,7 @@ module Struct =
                          in ((ctyp t1), (ctyp t2), (mkloc loc)))
                       cl
                   in
-                    ((with_loc c cloc),
+                    ((with_doc c cloc),
                      (type_decl
                         (List.fold_right optional_type_parameters tl []) cl
                         td cloc)) ::
@@ -15317,25 +15320,25 @@ module Struct =
               | SgDir (_, _, _) -> l
               | Ast.SgExc (loc, (Ast.TyId (_, (Ast.IdUid (_, s))))) ->
                   (mksig loc
-                     (Psig_exception ((with_loc (conv_con s) loc), []))) ::
+                     (Psig_exception ((with_doc (conv_con s) loc), []))) ::
                     l
               | Ast.SgExc (loc,
                   (Ast.TyOf (_, (Ast.TyId (_, (Ast.IdUid (_, s)))), t))) ->
                   (mksig loc
-                     (Psig_exception ((with_loc (conv_con s) loc),
+                     (Psig_exception ((with_doc (conv_con s) loc),
                         (List.map ctyp (list_of_ctyp t []))))) ::
                     l
               | SgExc (_, _) -> assert false
               | SgExt (loc, n, t, sl) ->
                   (mksig loc
-                     (Psig_value ((with_loc n loc),
+                     (Psig_value ((with_doc n loc),
                         (mkvalue_desc loc t (list_of_meta_list sl))))) ::
                     l
               | SgInc (loc, mt) ->
-                  (mksig loc (Psig_include (module_type mt))) :: l
+                  (mksig loc (Psig_include ((module_type mt), None))) :: l
               | SgMod (loc, n, mt) ->
                   (mksig loc
-                     (Psig_module ((with_loc n loc), (module_type mt)))) ::
+                     (Psig_module ((with_doc n loc), (module_type mt)))) ::
                     l
               | SgRecMod (loc, mb) ->
                   (mksig loc (Psig_recmodule (module_sig_binding mb []))) ::
@@ -15345,14 +15348,14 @@ module Struct =
                     (match mt with
                      | MtQuo (_, _) -> Pmodtype_abstract
                      | _ -> Pmodtype_manifest (module_type mt))
-                  in (mksig loc (Psig_modtype ((with_loc n loc), si))) :: l
+                  in (mksig loc (Psig_modtype ((with_doc n loc), si))) :: l
               | SgOpn (loc, id) ->
                   (mksig loc (Psig_open (long_uident id))) :: l
               | SgTyp (loc, tdl) ->
                   (mksig loc (Psig_type (mktype_decl tdl []))) :: l
               | SgVal (loc, n, t) ->
                   (mksig loc
-                     (Psig_value ((with_loc n loc), (mkvalue_desc loc t [])))) ::
+                     (Psig_value ((with_doc n loc), (mkvalue_desc loc t [])))) ::
                     l
               | Ast.SgAnt (loc, _) -> error loc "antiquotation in sig_item"
             and module_sig_binding x acc =
@@ -15360,14 +15363,14 @@ module Struct =
               | Ast.MbAnd (_, x, y) ->
                   module_sig_binding x (module_sig_binding y acc)
               | Ast.MbCol (loc, s, mt) ->
-                  ((with_loc s loc), (module_type mt)) :: acc
+                  ((with_doc s loc), (module_type mt)) :: acc
               | _ -> assert false
             and module_str_binding x acc =
               match x with
               | Ast.MbAnd (_, x, y) ->
                   module_str_binding x (module_str_binding y acc)
               | Ast.MbColEq (loc, s, mt, me) ->
-                  ((with_loc s loc), (module_type mt), (module_expr me)) ::
+                  ((with_doc s loc), (module_type mt), (module_expr me)) ::
                     acc
               | _ -> assert false
             and module_expr =
@@ -15418,19 +15421,19 @@ module Struct =
               | Ast.StExc (loc, (Ast.TyId (_, (Ast.IdUid (_, s)))), Ast.
                   ONone) ->
                   (mkstr loc
-                     (Pstr_exception ((with_loc (conv_con s) loc), []))) ::
+                     (Pstr_exception ((with_doc (conv_con s) loc), []))) ::
                     l
               | Ast.StExc (loc,
                   (Ast.TyOf (_, (Ast.TyId (_, (Ast.IdUid (_, s)))), t)), Ast.
                   ONone) ->
                   (mkstr loc
-                     (Pstr_exception ((with_loc (conv_con s) loc),
+                     (Pstr_exception ((with_doc (conv_con s) loc),
                         (List.map ctyp (list_of_ctyp t []))))) ::
                     l
               | Ast.StExc (loc, (Ast.TyId (_, (Ast.IdUid (_, s)))),
                   (Ast.OSome i)) ->
                   (mkstr loc
-                     (Pstr_exn_rebind ((with_loc (conv_con s) loc),
+                     (Pstr_exn_rebind ((with_doc (conv_con s) loc),
                         (ident i)))) ::
                     l
               | Ast.StExc (loc,
@@ -15440,28 +15443,31 @@ module Struct =
               | StExp (loc, e) -> (mkstr loc (Pstr_eval (expr e))) :: l
               | StExt (loc, n, t, sl) ->
                   (mkstr loc
-                     (Pstr_primitive ((with_loc n loc),
+                     (Pstr_primitive ((with_doc n loc),
                         (mkvalue_desc loc t (list_of_meta_list sl))))) ::
                     l
               | StInc (loc, me) ->
-                  (mkstr loc (Pstr_include (module_expr me))) :: l
+                  (mkstr loc (Pstr_include ((module_expr me), None))) :: l
               | StMod (loc, n, me) ->
                   (mkstr loc
-                     (Pstr_module ((with_loc n loc), (module_expr me)))) ::
+                     (Pstr_module ((with_doc n loc), (module_expr me)))) ::
                     l
               | StRecMod (loc, mb) ->
                   (mkstr loc (Pstr_recmodule (module_str_binding mb []))) ::
                     l
               | StMty (loc, n, mt) ->
                   (mkstr loc
-                     (Pstr_modtype ((with_loc n loc), (module_type mt)))) ::
+                     (Pstr_modtype ((with_doc n loc), (module_type mt)))) ::
                     l
               | StOpn (loc, id) ->
                   (mkstr loc (Pstr_open (long_uident id))) :: l
               | StTyp (loc, tdl) ->
                   (mkstr loc (Pstr_type (mktype_decl tdl []))) :: l
               | StVal (loc, rf, bi) ->
-                  (mkstr loc (Pstr_value ((mkrf rf), (binding bi [])))) :: l
+                  (mkstr loc 
+                     (Pstr_value ((mkrf rf), 
+                        (List.map (fun b -> (b, None)) (binding bi []))))) ::
+                    l
               | Ast.StAnt (loc, _) -> error loc "antiquotation in str_item"
             and class_type =
               function
@@ -15508,7 +15514,7 @@ module Struct =
                     {
                       pci_virt = mkvirtual vir;
                       pci_params = (params, (mkloc loc_params));
-                      pci_name = with_loc name nloc;
+                      pci_name = with_doc name nloc;
                       pci_expr = class_expr ce;
                       pci_loc = mkloc loc;
                       pci_variance = variance;
@@ -15531,7 +15537,7 @@ module Struct =
                     {
                       pci_virt = mkvirtual vir;
                       pci_params = (params, (mkloc loc_params));
-                      pci_name = with_loc name nloc;
+                      pci_name = with_doc name nloc;
                       pci_expr = class_type ct;
                       pci_loc = mkloc loc;
                       pci_variance = variance;
@@ -15619,7 +15625,7 @@ module Struct =
                   in
                     (mkcf loc
                        (Pcf_inher ((override_flag loc ov), (class_expr ce),
-                          opb))) ::
+                          opb, None))) ::
                       l
               | CrIni (loc, e) -> (mkcf loc (Pcf_init (expr e))) :: l
               | CrMth (loc, s, ov, pf, e, t) ->
@@ -15631,25 +15637,25 @@ module Struct =
                   in
                     (mkcf loc
                        (Pcf_meth
-                          (((with_loc s loc), (mkprivate pf),
+                          (((with_doc s loc), (mkprivate pf),
                             (override_flag loc ov), e)))) ::
                       l
               | CrVal (loc, s, ov, mf, e) ->
                   (mkcf loc
                      (Pcf_val
-                        (((with_loc s loc), (mkmutable mf),
+                        (((with_doc s loc), (mkmutable mf),
                           (override_flag loc ov), (expr e))))) ::
                     l
               | CrVir (loc, s, pf, t) ->
                   (mkcf loc
                      (Pcf_virt
-                        (((with_loc s loc), (mkprivate pf),
+                        (((with_doc s loc), (mkprivate pf),
                           (mkpolytype (ctyp t)))))) ::
                     l
               | CrVvr (loc, s, mf, t) ->
                   (mkcf loc
                      (Pcf_valvirt
-                        (((with_loc s loc), (mkmutable mf), (ctyp t))))) ::
+                        (((with_doc s loc), (mkmutable mf), (ctyp t))))) ::
                     l
               | CrAnt (_, _) -> assert false
               

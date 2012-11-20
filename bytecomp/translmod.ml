@@ -287,6 +287,7 @@ and transl_structure fields cc rootpath = function
       | Tstr_eval expr ->
       Lsequence(transl_exp expr, transl_structure fields cc rootpath rem)
   | Tstr_value(rec_flag, pat_expr_list) ->
+      let pat_expr_list = List.map fst pat_expr_list in
       let ext_fields = rev_let_bound_idents pat_expr_list @ fields in
       transl_let rec_flag pat_expr_list
                  (transl_structure ext_fields cc rootpath rem)
@@ -327,7 +328,7 @@ and transl_structure fields cc rootpath = function
               transl_structure (List.rev ids @ fields) cc rootpath rem)
   | Tstr_class_type cl_list ->
       transl_structure fields cc rootpath rem
-  | Tstr_include(modl, ids) ->
+  | Tstr_include(modl, ids, info) ->
       let mid = Ident.create "include" in
       let rec rebind_idents pos newfields = function
         [] ->
@@ -337,6 +338,8 @@ and transl_structure fields cc rootpath = function
                rebind_idents (pos + 1) (id :: newfields) ids) in
       Llet(Strict, mid, transl_module Tcoerce_none None modl,
            rebind_idents 0 fields ids)
+  | Tstr_comment com ->
+      transl_structure fields cc rootpath rem
 
 (* Update forward declaration in Translcore *)
 let _ =
@@ -383,6 +386,7 @@ let transl_store_structure glob map prims str =
       Lsequence(subst_lambda subst (transl_exp expr),
                 transl_store subst rem)
   | Tstr_value(rec_flag, pat_expr_list) ->
+      let pat_expr_list = List.map fst pat_expr_list in
       let ids = let_bound_idents pat_expr_list in
       let lam = transl_let rec_flag pat_expr_list (store_idents ids) in
       Lsequence(subst_lambda subst lam,
@@ -439,7 +443,9 @@ let transl_store_structure glob map prims str =
                 transl_store (add_idents false ids subst) rem)
   | Tstr_class_type cl_list ->
       transl_store subst rem
-  | Tstr_include(modl, ids) ->
+  | Tstr_comment com -> 
+      transl_store subst rem
+  | Tstr_include(modl, ids, info) ->
       let mid = Ident.create "include" in
       let rec store_idents pos = function
         [] -> transl_store (add_idents true ids subst) rem
@@ -493,7 +499,7 @@ let rec defined_idents items =
       match item.str_desc with
   | Tstr_eval expr -> defined_idents rem
   | Tstr_value(rec_flag, pat_expr_list) ->
-      let_bound_idents pat_expr_list @ defined_idents rem
+      let_bound_idents (List.map fst pat_expr_list) @ defined_idents rem
   | Tstr_primitive(id, _, descr) -> defined_idents rem
   | Tstr_type decls -> defined_idents rem
   | Tstr_exception(id, _, decl) -> id :: defined_idents rem
@@ -505,7 +511,8 @@ let rec defined_idents items =
   | Tstr_class cl_list ->
       List.map (fun (ci, _, _) -> ci.ci_id_class) cl_list @ defined_idents rem
   | Tstr_class_type cl_list -> defined_idents rem
-  | Tstr_include(modl, ids) -> ids @ defined_idents rem
+  | Tstr_include(modl, ids, info) -> ids @ defined_idents rem
+  | Tstr_comment com -> defined_idents rem
 
 (* Transform a coercion and the list of value identifiers defined by
    a toplevel structure into a table [id -> (pos, coercion)],
@@ -608,6 +615,7 @@ let transl_toplevel_item item =
     Tstr_eval expr ->
       transl_exp expr
   | Tstr_value(rec_flag, pat_expr_list) ->
+      let pat_expr_list = List.map fst pat_expr_list in
       let idents = let_bound_idents pat_expr_list in
       transl_let rec_flag pat_expr_list
                  (make_sequence toploop_setvalue_id idents)
@@ -651,7 +659,7 @@ let transl_toplevel_item item =
                 cl_list)
   | Tstr_class_type cl_list ->
       lambda_unit
-  | Tstr_include(modl, ids) ->
+  | Tstr_include(modl, ids, info) ->
       let mid = Ident.create "include" in
       let rec set_idents pos = function
         [] ->
@@ -660,6 +668,8 @@ let transl_toplevel_item item =
           Lsequence(toploop_setvalue id (Lprim(Pfield pos, [Lvar mid])),
                     set_idents (pos + 1) ids) in
       Llet(Strict, mid, transl_module Tcoerce_none None modl, set_idents 0 ids)
+  | Tstr_comment com -> 
+      lambda_unit
 
 let transl_toplevel_item_and_close itm =
   close_toplevel_term (transl_label_init (transl_toplevel_item itm))

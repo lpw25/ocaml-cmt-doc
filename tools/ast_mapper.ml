@@ -86,8 +86,8 @@ module T = struct
 
   let map_type_kind sub = function
     | Ptype_abstract -> Ptype_abstract
-    | Ptype_variant l -> Ptype_variant (List.map (fun (s, tl, t, loc) -> (s, List.map (sub # typ) tl, map_opt (sub # typ) t, loc)) l)
-    | Ptype_record l -> Ptype_record (List.map (fun (s, flags, t, loc) -> (s, flags, sub # typ t, loc)) l)
+    | Ptype_variant l -> Ptype_variant (List.map (fun (s, tl, t, loc, com) -> (s, List.map (sub # typ) tl, map_opt (sub # typ) t, loc, com)) l)
+    | Ptype_record l -> Ptype_record (List.map (fun (s, flags, t, loc, com) -> (s, flags, sub # typ t, loc, com)) l)
 end
 
 module CT = struct
@@ -165,9 +165,10 @@ module MT = struct
   let rec_module ?loc a = mk_item ?loc (Psig_recmodule a)
   let modtype ?loc a b = mk_item ?loc (Psig_modtype (a, b))
   let open_ ?loc a = mk_item ?loc (Psig_open a)
-  let include_ ?loc a = mk_item ?loc (Psig_include a)
+  let include_ ?loc a b = mk_item ?loc (Psig_include (a, b))
   let class_ ?loc a = mk_item ?loc (Psig_class a)
   let class_type ?loc a = mk_item ?loc (Psig_class_type a)
+  let comment ?loc a = mk_item ?loc (Psig_comment a)
 
   let map_signature_item sub {psig_desc = desc; psig_loc = loc} =
     match desc with
@@ -179,9 +180,10 @@ module MT = struct
     | Psig_modtype (s, Pmodtype_manifest mt) -> modtype ~loc s (Pmodtype_manifest  (sub # module_type mt))
     | Psig_modtype (s, Pmodtype_abstract) -> modtype ~loc s Pmodtype_abstract
     | Psig_open s -> open_ ~loc s
-    | Psig_include mt -> include_ ~loc (sub # module_type mt)
+    | Psig_include (mt, i) -> include_ ~loc (sub # module_type mt) i
     | Psig_class l -> class_ ~loc (List.map (sub # class_description) l)
     | Psig_class_type l -> class_type ~loc (List.map (sub # class_type_declaration) l)
+    | Psig_comment c -> comment ~loc c
 
 end
 
@@ -219,12 +221,13 @@ module M = struct
   let open_ ?loc a = mk_item ?loc (Pstr_open a)
   let class_ ?loc a = mk_item ?loc (Pstr_class a)
   let class_type ?loc a = mk_item ?loc (Pstr_class_type a)
-  let include_ ?loc a = mk_item ?loc (Pstr_include a)
+  let include_ ?loc a b = mk_item ?loc (Pstr_include (a, b))
+  let comment ?loc a = mk_item ?loc (Pstr_comment a)
 
   let map_structure_item sub {pstr_loc = loc; pstr_desc = desc} =
     match desc with
     | Pstr_eval x -> eval ~loc (sub # expr x)
-    | Pstr_value (r, pel) -> value ~loc r (List.map (map_tuple (sub # pat) (sub # expr)) pel)
+    | Pstr_value (r, pel) -> value ~loc r (List.map (fun ((p,e),i) -> (((sub # pat p), (sub # expr e)), i)) pel)
     | Pstr_primitive (name, vd) -> primitive ~loc name (sub # value_description vd)
     | Pstr_type l -> type_ ~loc (List.map (fun (s, d) -> (s, sub # type_declaration d)) l)
     | Pstr_exception (name, ed) -> exception_ ~loc name (sub # exception_declaration ed)
@@ -235,7 +238,8 @@ module M = struct
     | Pstr_open lid -> open_ ~loc lid
     | Pstr_class l -> class_ ~loc (List.map (sub # class_declaration) l)
     | Pstr_class_type l -> class_type ~loc (List.map (sub # class_type_declaration) l)
-    | Pstr_include e -> include_ ~loc (sub # module_expr e)
+    | Pstr_include (e, i) -> include_ ~loc (sub # module_expr e) i
+    | Pstr_comment c -> comment ~loc c
 end
 
 module E = struct
@@ -392,23 +396,25 @@ module CE = struct
 
   let mk_field ?(loc = Location.none) x = {pcf_desc = x; pcf_loc = loc}
 
-  let inher ?loc a b c = mk_field ?loc (Pcf_inher (a, b, c))
+  let inher ?loc a b c d = mk_field ?loc (Pcf_inher (a, b, c, d))
   let valvirt ?loc a b c = mk_field ?loc (Pcf_valvirt (a, b, c))
   let val_ ?loc a b c d = mk_field ?loc (Pcf_val (a, b, c, d))
   let virt ?loc a b c = mk_field ?loc (Pcf_virt (a, b, c))
   let meth ?loc a b c d = mk_field ?loc (Pcf_meth (a, b, c, d))
   let constr ?loc a b = mk_field ?loc (Pcf_constr (a, b))
   let init ?loc a = mk_field ?loc (Pcf_init a)
+  let comment ?loc a = mk_field ?loc (Pcf_comment a)
 
   let map_field sub {pcf_desc = desc; pcf_loc = loc} =
     match desc with
-    | Pcf_inher (o, ce, s) -> inher ~loc o (sub # class_expr ce) s
+    | Pcf_inher (o, ce, s, c) -> inher ~loc o (sub # class_expr ce) s c
     | Pcf_valvirt (s, m, t) -> valvirt ~loc s m (sub # typ t)
     | Pcf_val (s, m, o, e) -> val_ ~loc s m o (sub # expr e)
     | Pcf_virt (s, p, t) -> virt ~loc s p (sub # typ t)
     | Pcf_meth (s, p, o, e) -> meth ~loc s p o (sub # expr e)
     | Pcf_constr (t1, t2) -> constr ~loc (sub # typ t1) (sub # typ t2)
     | Pcf_init e -> init ~loc (sub # expr e)
+    | Pcf_comment c -> comment ~loc c
 
   let map_structure sub {pcstr_pat; pcstr_fields} =
     {

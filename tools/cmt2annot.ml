@@ -94,6 +94,7 @@ let iterator rebuild_env =
       begin match s with
       | {str_desc = Tstr_value (rec_flag, bindings); str_loc = loc} ->
           let open Location in
+          let bindings = List.map fst bindings in
           let doit loc_start = bind_bindings {scope with loc_start} bindings in
           begin match rec_flag, rem with
           | Default, _ -> ()

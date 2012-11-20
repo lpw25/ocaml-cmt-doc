@@ -114,7 +114,7 @@ let parse_mod_use_file name lb =
   in
   [ Ptop_def
       [ { pstr_desc =
-            Pstr_module ( Location.mknoloc modname ,
+            Pstr_module ( Info.mkdoc modname Location.none None,
                           { pmod_desc = Pmod_structure items;
                             pmod_loc = Location.none } );
           pstr_loc = Location.none } ] ]

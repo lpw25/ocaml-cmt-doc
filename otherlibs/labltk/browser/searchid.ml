@@ -438,7 +438,7 @@ let search_structure str ~name ~kind ~prefix =
           List.fold_left ~init:[] str ~f:
             begin fun acc item ->
               match item.pstr_desc with
-                Pstr_module (s, mexp) when s.txt = modu ->
+                Pstr_module (s, mexp) when s.dtxt = modu ->
                   loc := mexp.pmod_loc.loc_start.Lexing.pos_cnum;
                   begin match mexp.pmod_desc with
                     Pmod_structure str -> str
@@ -453,32 +453,32 @@ let search_structure str ~name ~kind ~prefix =
       if match item.pstr_desc with
         Pstr_value (_, l) when kind = Pvalue ->
           List.iter l ~f:
-            begin fun (pat,_) ->
+            begin fun ((pat,_), _) ->
               if List.mem name (bound_variables pat)
               then loc := pat.ppat_loc.loc_start.Lexing.pos_cnum
             end;
           false
-      | Pstr_primitive (s, _) when kind = Pvalue -> name = s.txt
+      | Pstr_primitive (s, _) when kind = Pvalue -> name = s.dtxt
       | Pstr_type l when kind = Ptype ->
           List.iter l ~f:
             begin fun (s, td) ->
-              if s.txt = name then loc := td.ptype_loc.loc_start.Lexing.pos_cnum
+              if s.dtxt = name then loc := td.ptype_loc.loc_start.Lexing.pos_cnum
             end;
           false
-      | Pstr_exception (s, _) when kind = Pconstructor -> name = s.txt
-      | Pstr_module (s, _) when kind = Pmodule -> name = s.txt
-      | Pstr_modtype (s, _) when kind = Pmodtype -> name = s.txt
+      | Pstr_exception (s, _) when kind = Pconstructor -> name = s.dtxt
+      | Pstr_module (s, _) when kind = Pmodule -> name = s.dtxt
+      | Pstr_modtype (s, _) when kind = Pmodtype -> name = s.dtxt
       | Pstr_class l when kind = Pclass || kind = Ptype || kind = Pcltype ->
           List.iter l ~f:
             begin fun c ->
-              if c.pci_name.txt = name
+              if c.pci_name.dtxt = name
               then loc := c.pci_loc.loc_start.Lexing.pos_cnum
             end;
           false
       | Pstr_class_type l when kind = Pcltype || kind = Ptype ->
           List.iter l ~f:
             begin fun c ->
-              if c.pci_name.txt = name
+              if c.pci_name.dtxt = name
               then loc := c.pci_loc.loc_start.Lexing.pos_cnum
             end;
           false
@@ -498,7 +498,7 @@ let search_signature sign ~name ~kind ~prefix =
           List.fold_left ~init:[] sign ~f:
             begin fun acc item ->
               match item.psig_desc with
-                Psig_module (s, mtyp) when s.txt = modu ->
+                Psig_module (s, mtyp) when s.dtxt = modu ->
                   loc := mtyp.pmty_loc.loc_start.Lexing.pos_cnum;
                   begin match mtyp.pmty_desc with
                     Pmty_signature sign -> sign
@@ -511,27 +511,27 @@ let search_signature sign ~name ~kind ~prefix =
   List.iter (search_module_type sign ~prefix) ~f:
     begin fun item ->
       if match item.psig_desc with
-        Psig_value (s, _) when kind = Pvalue -> name = s.txt
+        Psig_value (s, _) when kind = Pvalue -> name = s.dtxt
       | Psig_type l when kind = Ptype ->
           List.iter l ~f:
             begin fun (s, td) ->
-              if s.txt = name then loc := td.ptype_loc.loc_start.Lexing.pos_cnum
+              if s.dtxt = name then loc := td.ptype_loc.loc_start.Lexing.pos_cnum
             end;
           false
-      | Psig_exception (s, _) when kind = Pconstructor -> name = s.txt
-      | Psig_module (s, _) when kind = Pmodule -> name = s.txt
-      | Psig_modtype (s, _) when kind = Pmodtype -> name = s.txt
+      | Psig_exception (s, _) when kind = Pconstructor -> name = s.dtxt
+      | Psig_module (s, _) when kind = Pmodule -> name = s.dtxt
+      | Psig_modtype (s, _) when kind = Pmodtype -> name = s.dtxt
       | Psig_class l when kind = Pclass || kind = Ptype || kind = Pcltype ->
           List.iter l ~f:
             begin fun c ->
-              if c.pci_name.txt = name
+              if c.pci_name.dtxt = name
               then loc := c.pci_loc.loc_start.Lexing.pos_cnum
             end;
           false
       | Psig_class_type l when kind = Ptype || kind = Pcltype ->
           List.iter l ~f:
             begin fun c ->
-              if c.pci_name.txt = name
+              if c.pci_name.dtxt = name
               then loc := c.pci_loc.loc_start.Lexing.pos_cnum
             end;
           false

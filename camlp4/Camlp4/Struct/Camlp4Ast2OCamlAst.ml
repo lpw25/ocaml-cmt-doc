@@ -58,6 +58,7 @@ module Make (Ast : Sig.Camlp4Ast) = struct
   value mkghloc loc = Loc.to_ocaml_location (Loc.ghostify loc);
 
   value with_loc txt loc = Camlp4_import.Location.mkloc txt (mkloc loc);
+  value with_doc txt loc = Camlp4_import.Info.mkdoc txt (mkloc loc) None;
 
   value mktyp loc d = {ptyp_desc = d; ptyp_loc = mkloc loc};
   value mkpat loc d = {ppat_desc = d; ppat_loc = mkloc loc};
@@ -332,20 +333,20 @@ module Make (Ast : Sig.Camlp4Ast) = struct
   value mktrecord =
     fun
     [ <:ctyp@loc< $id:(<:ident@sloc< $lid:s$ >>)$ : mutable $t$ >> ->
-        (with_loc s sloc, Mutable, mkpolytype (ctyp t), mkloc loc)
+        (with_loc s sloc, Mutable, mkpolytype (ctyp t), mkloc loc, None)
     | <:ctyp@loc< $id:(<:ident@sloc< $lid:s$ >>)$ : $t$ >> ->
-        (with_loc s sloc, Immutable, mkpolytype (ctyp t), mkloc loc)
+        (with_loc s sloc, Immutable, mkpolytype (ctyp t), mkloc loc, None)
     | _ -> assert False (*FIXME*) ];
   value mkvariant =
     fun
     [ <:ctyp@loc< $id:(<:ident@sloc< $uid:s$ >>)$ >> ->
-      (with_loc (conv_con s) sloc, [], None, mkloc loc)
+      (with_loc (conv_con s) sloc, [], None, mkloc loc, None)
     | <:ctyp@loc< $id:(<:ident@sloc< $uid:s$ >>)$ of $t$ >> ->
-      (with_loc (conv_con s) sloc, List.map ctyp (list_of_ctyp t []), None, mkloc loc)
+      (with_loc (conv_con s) sloc, List.map ctyp (list_of_ctyp t []), None, mkloc loc, None)
     | <:ctyp@loc< $id:(<:ident@sloc< $uid:s$ >>)$ : ($t$ -> $u$) >> ->
-      (with_loc (conv_con s) sloc, List.map ctyp (list_of_ctyp t []), Some (ctyp u), mkloc loc)
+      (with_loc (conv_con s) sloc, List.map ctyp (list_of_ctyp t []), Some (ctyp u), mkloc loc, None)
     | <:ctyp@loc< $id:(<:ident@sloc< $uid:s$ >>)$ : $t$ >> ->
-      (with_loc (conv_con s) sloc, [], Some (ctyp t), mkloc loc)
+      (with_loc (conv_con s) sloc, [], Some (ctyp t), mkloc loc, None)
 
     | _ -> assert False (*FIXME*) ];
   value rec type_decl tl cl loc m pflag =
@@ -958,7 +959,7 @@ value varify_constructors var_names =
               (ctyp t1, ctyp t2, mkloc loc))
             cl
         in
-        [(with_loc c cloc,
+        [(with_doc c cloc,
           type_decl (List.fold_right optional_type_parameters tl []) cl td cloc) :: acc]
     | _ -> assert False ]
   and module_type =
@@ -987,14 +988,14 @@ value varify_constructors var_names =
     | <:sig_item< $sg1$; $sg2$ >> -> sig_item sg1 (sig_item sg2 l)
     | SgDir _ _ _ -> l
     | <:sig_item@loc< exception $uid:s$ >> ->
-        [mksig loc (Psig_exception (with_loc (conv_con s) loc) []) :: l]
+        [mksig loc (Psig_exception (with_doc (conv_con s) loc) []) :: l]
     | <:sig_item@loc< exception $uid:s$ of $t$ >> ->
-        [mksig loc (Psig_exception (with_loc (conv_con s) loc)
+        [mksig loc (Psig_exception (with_doc (conv_con s) loc)
                                    (List.map ctyp (list_of_ctyp t []))) :: l]
     | SgExc _ _ -> assert False (*FIXME*)
-    | SgExt loc n t sl -> [mksig loc (Psig_value (with_loc n loc) (mkvalue_desc loc t (list_of_meta_list sl))) :: l]
-    | SgInc loc mt -> [mksig loc (Psig_include (module_type mt)) :: l]
-    | SgMod loc n mt -> [mksig loc (Psig_module (with_loc n loc) (module_type mt)) :: l]
+    | SgExt loc n t sl -> [mksig loc (Psig_value (with_doc n loc) (mkvalue_desc loc t (list_of_meta_list sl))) :: l]
+    | SgInc loc mt -> [mksig loc (Psig_include (module_type mt) None) :: l]
+    | SgMod loc n mt -> [mksig loc (Psig_module (with_doc n loc) (module_type mt)) :: l]
     | SgRecMod loc mb ->
         [mksig loc (Psig_recmodule (module_sig_binding mb [])) :: l]
     | SgMty loc n mt ->
@@ -1003,25 +1004,25 @@ value varify_constructors var_names =
           [ MtQuo _ _ -> Pmodtype_abstract
           | _ -> Pmodtype_manifest (module_type mt) ]
         in
-        [mksig loc (Psig_modtype (with_loc n loc) si) :: l]
+        [mksig loc (Psig_modtype (with_doc n loc) si) :: l]
     | SgOpn loc id ->
         [mksig loc (Psig_open (long_uident id)) :: l]
     | SgTyp loc tdl -> [mksig loc (Psig_type (mktype_decl tdl [])) :: l]
-    | SgVal loc n t -> [mksig loc (Psig_value (with_loc n loc) (mkvalue_desc loc t [])) :: l]
+    | SgVal loc n t -> [mksig loc (Psig_value (with_doc n loc) (mkvalue_desc loc t [])) :: l]
     | <:sig_item@loc< $anti:_$ >> -> error loc "antiquotation in sig_item" ]
   and module_sig_binding x acc =
     match x with
     [ <:module_binding< $x$ and $y$ >> ->
         module_sig_binding x (module_sig_binding y acc)
     | <:module_binding@loc< $s$ : $mt$ >> ->
-        [(with_loc s loc, module_type mt) :: acc]
+        [(with_doc s loc, module_type mt) :: acc]
     | _ -> assert False ]
   and module_str_binding x acc =
     match x with
     [ <:module_binding< $x$ and $y$ >> ->
         module_str_binding x (module_str_binding y acc)
     | <:module_binding@loc< $s$ : $mt$ = $me$ >> ->
-        [(with_loc s loc, module_type mt, module_expr me) :: acc]
+        [(with_doc s loc, module_type mt, module_expr me) :: acc]
     | _ -> assert False ]
   and module_expr =
     fun
@@ -1055,27 +1056,27 @@ value varify_constructors var_names =
     | <:str_item< $st1$; $st2$ >> -> str_item st1 (str_item st2 l)
     | StDir _ _ _ -> l
     | <:str_item@loc< exception $uid:s$ >> ->
-        [mkstr loc (Pstr_exception (with_loc (conv_con s) loc) []) :: l ]
+        [mkstr loc (Pstr_exception (with_doc (conv_con s) loc) []) :: l ]
     | <:str_item@loc< exception $uid:s$ of $t$ >> ->
-        [mkstr loc (Pstr_exception (with_loc (conv_con s) loc)
+        [mkstr loc (Pstr_exception (with_doc (conv_con s) loc)
                       (List.map ctyp (list_of_ctyp t []))) :: l ]
     | <:str_item@loc< exception $uid:s$ = $i$ >> ->
-        [mkstr loc (Pstr_exn_rebind (with_loc (conv_con s) loc) (long_uident ~conv_con i)) :: l ]
+        [mkstr loc (Pstr_exn_rebind (with_doc (conv_con s) loc) (long_uident ~conv_con i)) :: l ]
     | <:str_item@loc< exception $uid:_$ of $_$ = $_$ >> ->
         error loc "type in exception alias"
     | StExc _ _ _ -> assert False (*FIXME*)
     | StExp loc e -> [mkstr loc (Pstr_eval (expr e)) :: l]
-    | StExt loc n t sl -> [mkstr loc (Pstr_primitive (with_loc n loc) (mkvalue_desc loc t (list_of_meta_list sl))) :: l]
-    | StInc loc me -> [mkstr loc (Pstr_include (module_expr me)) :: l]
-    | StMod loc n me -> [mkstr loc (Pstr_module (with_loc n loc) (module_expr me)) :: l]
+    | StExt loc n t sl -> [mkstr loc (Pstr_primitive (with_doc n loc) (mkvalue_desc loc t (list_of_meta_list sl))) :: l]
+    | StInc loc me -> [mkstr loc (Pstr_include (module_expr me) None) :: l]
+    | StMod loc n me -> [mkstr loc (Pstr_module (with_doc n loc) (module_expr me)) :: l]
     | StRecMod loc mb ->
         [mkstr loc (Pstr_recmodule (module_str_binding mb [])) :: l]
-    | StMty loc n mt -> [mkstr loc (Pstr_modtype (with_loc n loc) (module_type mt)) :: l]
+    | StMty loc n mt -> [mkstr loc (Pstr_modtype (with_doc n loc) (module_type mt)) :: l]
     | StOpn loc id ->
         [mkstr loc (Pstr_open (long_uident id)) :: l]
     | StTyp loc tdl -> [mkstr loc (Pstr_type (mktype_decl tdl [])) :: l]
     | StVal loc rf bi ->
-        [mkstr loc (Pstr_value (mkrf rf) (binding bi [])) :: l]
+        [mkstr loc (Pstr_value (mkrf rf) (List.map (fun b -> (b, None)) (binding bi []))) :: l]
     | <:str_item@loc< $anti:_$ >> -> error loc "antiquotation in str_item" ]
   and class_type =
     fun
@@ -1115,7 +1116,7 @@ value varify_constructors var_names =
       in
       {pci_virt = mkvirtual vir;
        pci_params = (params, mkloc loc_params);
-       pci_name = with_loc name nloc;
+       pci_name = with_doc name nloc;
        pci_expr = class_expr ce;
        pci_loc = mkloc loc;
        pci_variance = variance}
@@ -1131,7 +1132,7 @@ value varify_constructors var_names =
       in
       {pci_virt = mkvirtual vir;
        pci_params = (params, mkloc loc_params);
-       pci_name = with_loc name nloc;
+       pci_name = with_doc name nloc;
        pci_expr = class_type ct;
        pci_loc = mkloc loc;
        pci_variance = variance}
@@ -1197,7 +1198,7 @@ value varify_constructors var_names =
         class_str_item cst1 (class_str_item cst2 l)
     | CrInh loc ov ce pb ->
         let opb = if pb = "" then None else Some pb in
-        [mkcf loc (Pcf_inher (override_flag loc ov) (class_expr ce) opb) :: l]
+        [mkcf loc (Pcf_inher (override_flag loc ov) (class_expr ce) opb None) :: l]
     | CrIni loc e -> [mkcf loc (Pcf_init (expr e)) :: l]
     | CrMth loc s ov pf e t ->
         let t =
@@ -1205,13 +1206,13 @@ value varify_constructors var_names =
           [ <:ctyp<>> -> None
           | t -> Some (mkpolytype (ctyp t)) ] in
         let e = mkexp loc (Pexp_poly (expr e) t) in
-        [mkcf loc (Pcf_meth (with_loc s loc, mkprivate pf, override_flag loc ov, e)) :: l]
+        [mkcf loc (Pcf_meth (with_doc s loc, mkprivate pf, override_flag loc ov, e)) :: l]
     | CrVal loc s ov mf e ->
-        [mkcf loc (Pcf_val (with_loc s loc, mkmutable mf, override_flag loc ov, expr e)) :: l]
+        [mkcf loc (Pcf_val (with_doc s loc, mkmutable mf, override_flag loc ov, expr e)) :: l]
     | CrVir loc s pf t ->
-        [mkcf loc (Pcf_virt (with_loc s loc, mkprivate pf, mkpolytype (ctyp t))) :: l]
+        [mkcf loc (Pcf_virt (with_doc s loc, mkprivate pf, mkpolytype (ctyp t))) :: l]
     | CrVvr loc s mf t ->
-        [mkcf loc (Pcf_valvirt (with_loc s loc, mkmutable mf, ctyp t)) :: l]
+        [mkcf loc (Pcf_valvirt (with_doc s loc, mkmutable mf, ctyp t)) :: l]
     | CrAnt _ _ -> assert False ];
 
   value sig_item ast = sig_item ast [];

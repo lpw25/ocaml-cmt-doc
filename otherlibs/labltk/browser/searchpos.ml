@@ -171,9 +171,9 @@ let search_pos_type_decl td ~pos ~env =
       Ptype_abstract -> ()
     | Ptype_variant dl ->
         List.iter dl
-          ~f:(fun (_, tl, _, _) -> List.iter tl ~f:(search_pos_type ~pos ~env))
+          ~f:(fun (_, tl, _, _, _) -> List.iter tl ~f:(search_pos_type ~pos ~env))
     | Ptype_record dl ->
-        List.iter dl ~f:(fun (_, _, t, _) -> search_pos_type t ~pos ~env) in
+        List.iter dl ~f:(fun (_, _, t, _, _) -> search_pos_type t ~pos ~env) in
     search_tkind td.ptype_kind;
     List.iter td.ptype_cstrs ~f:
       begin fun (t1, t2, _) ->
@@ -221,7 +221,8 @@ let rec search_pos_signature l ~pos ~env =
             ~f:(fun ci -> search_pos_class_type ci.pci_expr ~pos ~env)
       (* The last cases should not happen in generated interfaces *)
       | Psig_open lid -> add_found_sig (`Module, lid.txt) ~env ~loc:pt.psig_loc
-      | Psig_include t -> search_pos_module t ~pos ~env
+      | Psig_include (t, _) -> search_pos_module t ~pos ~env
+      | Psig_comment _ -> ()
       end;
     env
   end)
@@ -660,7 +661,7 @@ let rec search_pos_structure ~pos str =
     Tstr_eval exp -> search_pos_expr exp ~pos
   | Tstr_value (rec_flag, l) ->
       List.iter l ~f:
-      begin fun (pat, exp) ->
+      begin fun ((pat, exp), _) ->
         let env =
           if rec_flag = Asttypes.Recursive then exp.exp_env else Env.empty in
         search_pos_pat pat ~pos ~env;
@@ -678,13 +679,14 @@ let rec search_pos_structure ~pos str =
   | Tstr_class l ->
       List.iter l ~f:(fun (cl, _, _) -> search_pos_class_expr cl.ci_expr ~pos)
   | Tstr_class_type _ -> ()
-  | Tstr_include (m, _) -> search_pos_module_expr m ~pos
+  | Tstr_include (m, _, _) -> search_pos_module_expr m ~pos
+  | Tstr_comment _ -> ()
   end
 
 and search_pos_class_structure ~pos cls =
   List.iter cls.cstr_fields ~f:
     begin function cf -> match cf.cf_desc with
-        Tcf_inher (_, cl, _, _, _) ->
+        Tcf_inher (_, cl, _, _, _, _) ->
           search_pos_class_expr cl ~pos
       | Tcf_val (_, _, _, _, Tcfk_concrete exp, _) -> search_pos_expr exp ~pos
       | Tcf_val _ -> ()
@@ -693,6 +695,7 @@ and search_pos_class_structure ~pos cls =
       | Tcf_constr _
       | Tcf_meth _
         -> assert false (* TODO !!!!!!!!!!!!!!!!! *)
+      | Tcf_comment _ -> ()
     end
 
 and search_pos_class_expr ~pos cl =
