@@ -100,7 +100,7 @@ module Typedtree_search =
             info_list
       | Typedtree.Tstr_value (_, pat_exp_list) ->
           List.iter
-            (fun (pat,exp) ->
+            (fun ((pat,exp), _) ->
               match iter_val_pattern pat.Typedtree.pat_desc with
                 None -> ()
               | Some n -> Hashtbl.add table_values n (pat,exp)
@@ -111,6 +111,7 @@ module Typedtree_search =
       | Typedtree.Tstr_open _ -> ()
       | Typedtree.Tstr_include _ -> ()
       | Typedtree.Tstr_eval _ -> ()
+      | Typedtree.Tstr_comment _ -> ()
 
     let tables typedtree =
       let t = Hashtbl.create 13 in
@@ -173,7 +174,7 @@ module Typedtree_search =
       let rec iter cpt = function
         | [] ->
             raise Not_found
-        | { cf_desc = Typedtree.Tcf_inher (_, clexp, _, _, _) } :: q ->
+        | { cf_desc = Typedtree.Tcf_inher (_, clexp, _, _, _, _) } :: q ->
             if n = cpt then clexp else iter (cpt+1) q
         | _ :: q ->
             iter cpt q
@@ -527,7 +528,7 @@ module Analyser =
           | item :: q ->
               let loc = item.Parsetree.pcf_loc in
               match item.Parsetree.pcf_desc with
-        | (Parsetree.Pcf_inher (_, p_clexp, _))  ->
+        | (Parsetree.Pcf_inher (_, p_clexp, _, _))  ->
             let tt_clexp =
               let n = List.length acc_inher in
               try Typedtree_search.get_nth_inherit_class_expr tt_cls n
@@ -554,8 +555,8 @@ module Analyser =
               p_clexp.Parsetree.pcl_loc.Location.loc_end.Lexing.pos_cnum
               q
 
-      | ((Parsetree.Pcf_val ({ txt = label }, mutable_flag, _, _) |
-          Parsetree.Pcf_valvirt ({ txt = label }, mutable_flag, _) ) as x) ->
+      | ((Parsetree.Pcf_val ({ dtxt = label }, mutable_flag, _, _) |
+          Parsetree.Pcf_valvirt ({ dtxt = label }, mutable_flag, _) ) as x) ->
             let virt = match x with Parsetree.Pcf_val _ -> false | _ -> true in
             let complete_name = Name.concat current_class_name label in
             let (info_opt, ele_comments) = get_comments_in_class last_pos loc.Location.loc_start.Lexing.pos_cnum in
@@ -587,7 +588,7 @@ module Analyser =
           in
           iter acc_inher (acc_fields @ ele_comments @ [ Class_attribute att ]) loc.Location.loc_end.Lexing.pos_cnum q
 
-        | (Parsetree.Pcf_virt  ({ txt = label }, private_flag, _)) ->
+        | (Parsetree.Pcf_virt  ({ dtxt = label }, private_flag, _)) ->
             let complete_name = Name.concat current_class_name label in
             let (info_opt, ele_comments) = get_comments_in_class last_pos loc.Location.loc_start.Lexing.pos_cnum in
             let met_type =
@@ -629,7 +630,7 @@ module Analyser =
 
           iter acc_inher (acc_fields @ ele_comments @ [ Class_method met ]) loc.Location.loc_end.Lexing.pos_cnum q
 
-        | (Parsetree.Pcf_meth ({ txt = label }, private_flag, _, _)) ->
+        | (Parsetree.Pcf_meth ({ dtxt = label }, private_flag, _, _)) ->
             let complete_name = Name.concat current_class_name label in
             let (info_opt, ele_comments) = get_comments_in_class last_pos loc.Location.loc_start.Lexing.pos_cnum in
             let exp =
@@ -676,6 +677,8 @@ module Analyser =
 
         | (Parsetree.Pcf_init exp) ->
             iter acc_inher acc_fields exp.Parsetree.pexp_loc.Location.loc_end.Lexing.pos_cnum q
+        | Parsetree.Pcf_comment _ ->
+            iter acc_inher acc_fields loc.Location.loc_end.Lexing.pos_cnum q
       in
       iter [] [] last_pos (p_cls.Parsetree.pcstr_fields)
 
@@ -840,7 +843,7 @@ module Analyser =
     (** Analysis of a [Parsetree.class_declaration] and a [Typedtree.class_expr] to return a [t_class].*)
     let analyse_class env current_module_name comment_opt p_class_decl tt_type_params tt_class_exp table =
       let name = p_class_decl.Parsetree.pci_name in
-      let complete_name = Name.concat current_module_name name.txt in
+      let complete_name = Name.concat current_module_name name.dtxt in
       let loc = p_class_decl.Parsetree.pci_expr.Parsetree.pcl_loc in
       let pos_start = loc.Location.loc_start.Lexing.pos_cnum in
       let type_parameters = tt_type_params in
@@ -885,7 +888,7 @@ module Analyser =
     let tt_get_included_module_list tt_structure =
       let f acc item =
         match item.str_desc with
-          Typedtree.Tstr_include (mod_expr, _) ->
+          Typedtree.Tstr_include (mod_expr, _, _) ->
             acc @ [
                   { (* A VOIR : chercher dans les modules et les module types, avec quel env ? *)
                     im_name = tt_name_from_module_expr mod_expr ;
@@ -1066,6 +1069,7 @@ module Analyser =
             | Parsetree.Ppat_constraint (pat, _) -> iter_pat pat.Parsetree.ppat_desc
             | _ -> None
           in
+          let pat_exp_list = List.map fst pat_exp_list in
           let rec iter ?(first=false) last_pos acc_env acc p_e_list =
             match p_e_list with
               [] ->
@@ -1116,7 +1120,7 @@ module Analyser =
           let (new_env, l_ele) = iter ~first: true loc.Location.loc_start.Lexing.pos_cnum env [] pat_exp_list in
           (0, new_env, l_ele)
 
-      | Parsetree.Pstr_primitive ({ txt = name_pre }, val_desc) ->
+      | Parsetree.Pstr_primitive ({ dtxt = name_pre }, val_desc) ->
             (* of string * value_description *)
             print_DEBUG ("Parsetree.Pstr_primitive ("^name_pre^", ["^(String.concat ", " val_desc.Parsetree.pval_prim)^"]");
             let typ = Typedtree_search.search_primitive table name_pre in
@@ -1147,7 +1151,7 @@ module Analyser =
           (* we start by extending the environment *)
           let new_env =
             List.fold_left
-              (fun acc_env -> fun ({ txt = name }, _) ->
+              (fun acc_env -> fun ({ dtxt = name }, _) ->
                 let complete_name = Name.concat current_module_name name in
                 Odoc_env.add_type acc_env complete_name
               )
@@ -1157,7 +1161,7 @@ module Analyser =
           let rec f ?(first=false) maybe_more_acc last_pos name_type_decl_list =
             match name_type_decl_list with
               [] -> (maybe_more_acc, [])
-            | ({ txt = name }, type_decl) :: q ->
+            | ({ dtxt = name }, type_decl) :: q ->
                 let complete_name = Name.concat current_module_name name in
                 let loc = type_decl.Parsetree.ptype_loc in
                 let loc_start = loc.Location.loc_start.Lexing.pos_cnum in
@@ -1231,10 +1235,10 @@ module Analyser =
 
       | Parsetree.Pstr_exception (name, excep_decl) ->
           (* a new exception is defined *)
-          let complete_name = Name.concat current_module_name name.txt in
+          let complete_name = Name.concat current_module_name name.dtxt in
           (* we get the exception declaration in the typed tree *)
           let tt_excep_decl =
-            try Typedtree_search.search_exception table name.txt
+            try Typedtree_search.search_exception table name.dtxt
             with Not_found ->
               raise (Failure (Odoc_messages.exception_not_found_in_typedtree complete_name))
           in
@@ -1263,10 +1267,10 @@ module Analyser =
 
       | Parsetree.Pstr_exn_rebind (name,  _) ->
           (* a new exception is defined *)
-          let complete_name = Name.concat current_module_name name.txt in
+          let complete_name = Name.concat current_module_name name.dtxt in
           (* we get the exception rebind in the typed tree *)
           let tt_path =
-            try Typedtree_search.search_exception_rebind table name.txt
+            try Typedtree_search.search_exception_rebind table name.dtxt
             with Not_found ->
               raise (Failure (Odoc_messages.exception_not_found_in_typedtree complete_name))
           in
@@ -1288,11 +1292,11 @@ module Analyser =
           (
            (* of string * module_expr *)
            try
-             let tt_module_expr = Typedtree_search.search_module table name.txt in
+             let tt_module_expr = Typedtree_search.search_module table name.dtxt in
              let new_module_pre = analyse_module
                  env
                  current_module_name
-                 name.txt
+                 name.dtxt
                  comment_opt
                  module_expr
                  tt_module_expr
@@ -1322,7 +1326,7 @@ module Analyser =
              (0, new_env2, [ Element_module new_module ])
            with
              Not_found ->
-               let complete_name = Name.concat current_module_name name.txt in
+               let complete_name = Name.concat current_module_name name.dtxt in
                raise (Failure (Odoc_messages.module_not_found_in_typedtree complete_name))
           )
 
@@ -1332,16 +1336,16 @@ module Analyser =
           let new_env =
             List.fold_left
               (fun acc_env (name, _, mod_exp) ->
-                let complete_name = Name.concat current_module_name name.txt in
+                let complete_name = Name.concat current_module_name name.dtxt in
                 let e = Odoc_env.add_module acc_env complete_name in
                 let tt_mod_exp =
-                  try Typedtree_search.search_module table name.txt
+                  try Typedtree_search.search_module table name.dtxt
                   with Not_found -> raise (Failure (Odoc_messages.module_not_found_in_typedtree complete_name))
                 in
                 let new_module = analyse_module
                     e
                     current_module_name
-                    name.txt
+                    name.dtxt
                     None
                     mod_exp
                     tt_mod_exp
@@ -1360,11 +1364,11 @@ module Analyser =
             match name_mod_exp_list with
               [] -> []
             | (name, _, mod_exp) :: q ->
-                let complete_name = Name.concat current_module_name name.txt in
+                let complete_name = Name.concat current_module_name name.dtxt in
                 let loc_start = mod_exp.Parsetree.pmod_loc.Location.loc_start.Lexing.pos_cnum in
                 let loc_end =  mod_exp.Parsetree.pmod_loc.Location.loc_end.Lexing.pos_cnum in
                 let tt_mod_exp =
-                  try Typedtree_search.search_module table name.txt
+                  try Typedtree_search.search_module table name.dtxt
                   with Not_found -> raise (Failure (Odoc_messages.module_not_found_in_typedtree complete_name))
                 in
                 let (com_opt, ele_comments) = (* the comment for the first type was already retrieved *)
@@ -1376,7 +1380,7 @@ module Analyser =
                 let new_module = analyse_module
                     new_env
                     current_module_name
-                    name.txt
+                    name.dtxt
                     com_opt
                     mod_exp
                     tt_mod_exp
@@ -1388,9 +1392,9 @@ module Analyser =
           (0, new_env, eles)
 
       | Parsetree.Pstr_modtype (name, modtype) ->
-          let complete_name = Name.concat current_module_name name.txt in
+          let complete_name = Name.concat current_module_name name.dtxt in
           let tt_module_type =
-            try Typedtree_search.search_module_type table name.txt
+            try Typedtree_search.search_module_type table name.dtxt
             with Not_found ->
               raise (Failure (Odoc_messages.module_type_not_found_in_typedtree complete_name))
           in
@@ -1435,7 +1439,7 @@ module Analyser =
           let new_env =
             List.fold_left
               (fun acc_env -> fun class_decl ->
-                let complete_name = Name.concat current_module_name class_decl.Parsetree.pci_name.txt in
+                let complete_name = Name.concat current_module_name class_decl.Parsetree.pci_name.dtxt in
                 Odoc_env.add_class acc_env complete_name
               )
               env
@@ -1447,9 +1451,9 @@ module Analyser =
                 []
             | class_decl :: q ->
                 let (tt_class_exp, tt_type_params) =
-                  try Typedtree_search.search_class_exp table class_decl.Parsetree.pci_name.txt
+                  try Typedtree_search.search_class_exp table class_decl.Parsetree.pci_name.dtxt
                   with Not_found ->
-                    let complete_name = Name.concat current_module_name class_decl.Parsetree.pci_name.txt in
+                    let complete_name = Name.concat current_module_name class_decl.Parsetree.pci_name.dtxt in
                     raise (Failure (Odoc_messages.class_not_found_in_typedtree complete_name))
                 in
                 let (com_opt, ele_comments) =
@@ -1477,7 +1481,7 @@ module Analyser =
           let new_env =
             List.fold_left
               (fun acc_env -> fun class_type_decl ->
-                let complete_name = Name.concat current_module_name class_type_decl.Parsetree.pci_name.txt in
+                let complete_name = Name.concat current_module_name class_type_decl.Parsetree.pci_name.dtxt in
                 Odoc_env.add_class_type acc_env complete_name
               )
               env
@@ -1489,10 +1493,10 @@ module Analyser =
                 []
             | class_type_decl :: q ->
                 let name = class_type_decl.Parsetree.pci_name in
-                let complete_name = Name.concat current_module_name name.txt in
+                let complete_name = Name.concat current_module_name name.dtxt in
                 let virt = class_type_decl.Parsetree.pci_virt = Asttypes.Virtual in
                 let tt_cltype_declaration =
-                  try Typedtree_search.search_class_type_declaration table name.txt
+                  try Typedtree_search.search_class_type_declaration table name.dtxt
                   with Not_found ->
                     raise (Failure (Odoc_messages.class_type_not_found_in_typedtree complete_name))
                   in
@@ -1529,7 +1533,7 @@ module Analyser =
           in
           (0, new_env, f ~first: true loc.Location.loc_start.Lexing.pos_cnum class_type_decl_list)
 
-      | Parsetree.Pstr_include module_expr ->
+      | Parsetree.Pstr_include (module_expr, info) ->
           (* we add a dummy included module which will be replaced by a correct
              one at the end of the module analysis,
              to use the Path.t of the included modules in the typdtree. *)
@@ -1541,6 +1545,8 @@ module Analyser =
             }
           in
           (0, env, [ Element_included_module im ]) (* A VOIR : etendre l'environnement ? avec quoi ? *)
+      | Parsetree.Pstr_comment com ->
+          (0, env, [])
 
      (** Analysis of a [Parsetree.module_expr] and a name to return a [t_module].*)
      and analyse_module env current_module_name module_name comment_opt p_module_expr tt_module_expr =
