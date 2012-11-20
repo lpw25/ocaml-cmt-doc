@@ -442,7 +442,7 @@ and class_description i ppf x =
   line i ppf "pci_virt = %a\n" fmt_virtual_flag x.ci_virt;
   line i ppf "pci_params =\n";
   string_list_x_location (i+1) ppf x.ci_params;
-  line i ppf "pci_name = \"%s\"\n" x.ci_id_name.txt;
+  line i ppf "pci_name = \"%s\"\n" x.ci_id_name.dtxt;
   line i ppf "pci_expr =\n";
   class_type (i+1) ppf x.ci_expr;
 
@@ -452,7 +452,7 @@ and class_type_declaration i ppf x =
   line i ppf "pci_virt = %a\n" fmt_virtual_flag x.ci_virt;
   line i ppf "pci_params =\n";
   string_list_x_location (i+1) ppf x.ci_params;
-  line i ppf "pci_name = \"%s\"\n" x.ci_id_name.txt;
+  line i ppf "pci_name = \"%s\"\n" x.ci_id_name.dtxt;
   line i ppf "pci_expr =\n";
   class_type (i+1) ppf x.ci_expr;
 
@@ -496,25 +496,25 @@ and class_structure i ppf { cstr_pat = p; cstr_fields = l } =
 and class_field i ppf x = assert false (* TODO *)
 (*  let loc = x.cf_loc in
   match x.cf_desc with
-  | Tcf_inher (ovf, ce, so) ->
+  | Tcf_inher (ovf, ce, so, com) ->
       line i ppf "Pcf_inher %a\n" fmt_override_flag ovf;
       class_expr (i+1) ppf ce;
       option (i+1) string ppf so;
   | Tcf_valvirt (s, mf, ct) ->
       line i ppf "Pcf_valvirt \"%s\" %a %a\n"
-        s.txt fmt_mutable_flag mf fmt_location loc;
+        s.dtxt fmt_mutable_flag mf fmt_location loc;
       core_type (i+1) ppf ct;
   | Tcf_val (s, mf, ovf, e) ->
       line i ppf "Pcf_val \"%s\" %a %a %a\n"
-        s.txt fmt_mutable_flag mf fmt_override_flag ovf fmt_location loc;
+        s.dtxt fmt_mutable_flag mf fmt_override_flag ovf fmt_location loc;
       expression (i+1) ppf e;
   | Tcf_virt (s, pf, ct) ->
       line i ppf "Pcf_virt \"%s\" %a %a\n"
-        s.txt fmt_private_flag pf fmt_location loc;
+        s.dtxt fmt_private_flag pf fmt_location loc;
       core_type (i+1) ppf ct;
   | Tcf_meth (s, pf, ovf, e) ->
       line i ppf "Pcf_meth \"%s\" %a %a %a\n"
-        s.txt fmt_private_flag pf fmt_override_flag ovf fmt_location loc;
+        s.dtxt fmt_private_flag pf fmt_override_flag ovf fmt_location loc;
       expression (i+1) ppf e;
   | Tcf_constr (ct1, ct2) ->
       line i ppf "Pcf_constr %a\n" fmt_location loc;
@@ -523,6 +523,7 @@ and class_field i ppf x = assert false (* TODO *)
   | Tcf_init (e) ->
       line i ppf "Pcf_init\n";
       expression (i+1) ppf e;
+  | Tcf_comment c -> ()
 *)
 
 and class_declaration i ppf x =
@@ -531,7 +532,7 @@ and class_declaration i ppf x =
   line i ppf "pci_virt = %a\n" fmt_virtual_flag x.ci_virt;
   line i ppf "pci_params =\n";
   string_list_x_location (i+1) ppf x.ci_params;
-  line i ppf "pci_name = \"%s\"\n" x.ci_id_name.txt;
+  line i ppf "pci_name = \"%s\"\n" x.ci_id_name.dtxt;
   line i ppf "pci_expr =\n";
   class_expr (i+1) ppf x.ci_expr;
 
@@ -580,7 +581,7 @@ and signature_item i ppf x =
       line i ppf "Psig_modtype \"%a\"\n" fmt_ident s;
       modtype_declaration i ppf md;
   | Tsig_open (li,_) -> line i ppf "Psig_open %a\n" fmt_path li;
-  | Tsig_include (mt, _) ->
+  | Tsig_include (mt, _, _) ->
       line i ppf "Psig_include\n";
       module_type i ppf mt;
   | Tsig_class (l) ->
@@ -589,6 +590,7 @@ and signature_item i ppf x =
   | Tsig_class_type (l) ->
       line i ppf "Psig_class_type\n";
       list i class_type_declaration ppf l;
+  | Tsig_comment _ -> ()
 
 and modtype_declaration i ppf x =
   match x with
@@ -647,7 +649,7 @@ and structure_item i ppf x =
       expression i ppf e;
   | Tstr_value (rf, l) ->
       line i ppf "Pstr_value %a\n" fmt_rec_flag rf;
-      list i pattern_x_expression_def ppf l;
+      list i binding_x_info ppf l;
   | Tstr_primitive (s, _, vd) ->
       line i ppf "Pstr_primitive \"%a\"\n" fmt_ident s;
       value_description i ppf vd;
@@ -675,9 +677,10 @@ and structure_item i ppf x =
   | Tstr_class_type (l) ->
       line i ppf "Pstr_class_type\n";
       list i class_type_declaration ppf (List.map (fun (_, _, cl) -> cl) l);
-  | Tstr_include (me, _) ->
+  | Tstr_include (me, _, _) ->
       line i ppf "Pstr_include";
       module_expr i ppf me
+  | Tstr_comment _ -> ()
 
 and string_x_type_declaration i ppf (s, _, td) =
   ident i ppf s;
@@ -701,12 +704,12 @@ and core_type_x_core_type_x_location i ppf (ct1, ct2, l) =
   core_type (i+1) ppf ct1;
   core_type (i+1) ppf ct2;
 
-and string_x_core_type_list_x_location i ppf (s, _, l, r_opt) =
+and string_x_core_type_list_x_location i ppf (s, _, l, loc, com) =
   line i ppf "\"%a\"\n" fmt_ident s;
   list (i+1) core_type ppf l;
 (*  option (i+1) core_type ppf r_opt; *)
 
-and string_x_mutable_flag_x_core_type_x_location i ppf (s, _, mf, ct, loc) =
+and string_x_mutable_flag_x_core_type_x_location i ppf (s, _, mf, ct, loc, com) =
   line i ppf "\"%a\" %a %a\n" fmt_ident s fmt_mutable_flag mf fmt_location loc;
   core_type (i+1) ppf ct;
 
@@ -727,6 +730,9 @@ and pattern_x_expression_def i ppf (p, e) =
   line i ppf "<def>\n";
   pattern (i+1) ppf p;
   expression (i+1) ppf e;
+
+and binding_x_info i ppf (b, info) =
+  pattern_x_expression_def i ppf b
 
 and string_x_expression i ppf (s, _, e) =
   line i ppf "<override> \"%a\"\n" fmt_path s;

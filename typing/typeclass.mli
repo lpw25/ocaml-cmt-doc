@@ -16,7 +16,7 @@ open Format
 
 val class_declarations:
   Env.t -> Parsetree.class_declaration list ->
-  (Ident.t * string loc * class_declaration *
+  (Ident.t * string doc * class_declaration *
    Ident.t * class_type_declaration *
    Ident.t * type_declaration *
    Ident.t * type_declaration *
@@ -29,7 +29,7 @@ and class_declaration =
 
 val class_descriptions:
   Env.t -> Parsetree.class_description list ->
-  (Ident.t * string loc * class_declaration *
+  (Ident.t * string doc * class_declaration *
    Ident.t * class_type_declaration *
    Ident.t * type_declaration *
    Ident.t * type_declaration *
@@ -42,7 +42,7 @@ and class_description =
 
 val class_type_declarations:
   Env.t -> Parsetree.class_description list ->
-  (Ident.t * string loc * class_type_declaration *
+  (Ident.t * string doc * class_type_declaration *
    Ident.t * type_declaration *
    Ident.t * type_declaration *
   Typedtree.class_type_declaration) list * Env.t
@@ -54,7 +54,7 @@ and class_type_declaration =
 
 val approx_class_declarations:
   Env.t -> Parsetree.class_description list ->
-  (Ident.t * string loc * class_type_declaration *
+  (Ident.t * string doc * class_type_declaration *
    Ident.t * type_declaration *
    Ident.t * type_declaration *
   Typedtree.class_type_declaration) list

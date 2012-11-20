@@ -150,20 +150,20 @@ let transl_declaration env (name, sdecl) id =
       | Ptype_variant cstrs ->
         let all_constrs = ref StringSet.empty in
         List.iter
-          (fun ({ txt = name}, _, _, loc) ->
+          (fun ({ txt = name}, _, _, loc, _) ->
             if StringSet.mem name !all_constrs then
               raise(Error(sdecl.ptype_loc, Duplicate_constructor name));
             all_constrs := StringSet.add name !all_constrs)
           cstrs;
         if List.length
-          (List.filter (fun (_, args, _, _) -> args <> []) cstrs)
+          (List.filter (fun (_, args, _, _, _) -> args <> []) cstrs)
           > (Config.max_tag + 1) then
           raise(Error(sdecl.ptype_loc, Too_many_constructors));
-        let make_cstr (lid, args, ret_type, loc) =
+        let make_cstr (lid, args, ret_type, loc, com) =
           let name = Ident.create lid.txt in
           match ret_type with
             | None ->
-              (name, lid, List.map (transl_simple_type env true) args, None, loc)
+              (name, lid, List.map (transl_simple_type env true) args, None, loc, com)
             | Some sty ->
               (* if it's a generalized constructor we must first narrow and
                  then widen so as to not introduce any new constraints *)
@@ -181,30 +181,30 @@ let transl_declaration env (name, sdecl) id =
                                     (ty, Ctype.newconstr p params)))
               in
               widen z;
-              (name, lid, args, Some ret_type, loc)
+              (name, lid, args, Some ret_type, loc, com)
         in
         let cstrs = List.map make_cstr cstrs in
-        Ttype_variant (List.map (fun (name, lid, ctys, _, loc) ->
-          name, lid, ctys, loc
+        Ttype_variant (List.map (fun (name, lid, ctys, _, loc, com) ->
+          name, lid, ctys, loc, com
         ) cstrs),
-        Type_variant (List.map (fun (name, name_loc, ctys, option, loc) ->
+        Type_variant (List.map (fun (name, name_loc, ctys, option, loc, com) ->
           name, List.map (fun cty -> cty.ctyp_type) ctys, option) cstrs)
 
       | Ptype_record lbls ->
         let all_labels = ref StringSet.empty in
         List.iter
-          (fun ({ txt = name }, mut, arg, loc) ->
+          (fun ({ txt = name }, mut, arg, loc, com) ->
             if StringSet.mem name !all_labels then
               raise(Error(sdecl.ptype_loc, Duplicate_label name));
             all_labels := StringSet.add name !all_labels)
           lbls;
-        let lbls = List.map (fun (name, mut, arg, loc) ->
+        let lbls = List.map (fun (name, mut, arg, loc, com) ->
           let cty = transl_simple_type env true arg in
-          (Ident.create name.txt, name, mut, cty, loc)
+          (Ident.create name.txt, name, mut, cty, loc, com)
         ) lbls in
         let lbls' =
           List.map
-            (fun (name, name_loc, mut, cty, loc) ->
+            (fun (name, name_loc, mut, cty, loc, com) ->
               let ty = cty.ctyp_type in
               name, mut, match ty.desc with Tpoly(t,[]) -> t | _ -> ty)
             lbls in
@@ -252,7 +252,7 @@ let transl_declaration env (name, sdecl) id =
     begin match decl.type_manifest with None -> ()
       | Some ty ->
         if Ctype.cyclic_abbrev env id ty then
-          raise(Error(sdecl.ptype_loc, Recursive_abbrev name.txt));
+          raise(Error(sdecl.ptype_loc, Recursive_abbrev name.dtxt));
     end;
     let tdecl = {
       typ_params = sdecl.ptype_params;
@@ -327,8 +327,8 @@ let check_constraints env (_, sdecl) (_, decl) =
         (fun (name, tyl, ret_type) ->
           let (styl, sret_type) =
             try
-              let (_, sty, sret_type, _) =
-                List.find (fun (n,_,_,_) -> n.txt = Ident.name name)  pl
+              let (_, sty, sret_type, _, _) =
+                List.find (fun (n,_,_,_, _) -> n.txt = Ident.name name)  pl
               in (sty, sret_type)
             with Not_found -> assert false in
           List.iter2
@@ -349,7 +349,7 @@ let check_constraints env (_, sdecl) (_, decl) =
       let pl = find_pl sdecl.ptype_kind in
       let rec get_loc name = function
           [] -> assert false
-        | (name', _, sty, _) :: tl ->
+        | (name', _, sty, _, _) :: tl ->
             if name = name'.txt then sty.ptyp_loc else get_loc name tl
       in
       List.iter
@@ -718,23 +718,23 @@ let check_duplicates name_sdecl_list =
     (fun (name, sdecl) -> match sdecl.ptype_kind with
       Ptype_variant cl ->
         List.iter
-          (fun (cname, _, _, loc) ->
+          (fun (cname, _, _, loc, _) ->
             try
               let name' = Hashtbl.find constrs cname.txt in
               Location.prerr_warning loc
                 (Warnings.Duplicate_definitions
-                   ("constructor", cname.txt, name', name.txt))
-            with Not_found -> Hashtbl.add constrs cname.txt name.txt)
+                   ("constructor", cname.txt, name', name.dtxt))
+            with Not_found -> Hashtbl.add constrs cname.txt name.dtxt)
           cl
     | Ptype_record fl ->
         List.iter
-          (fun (cname, _, _, loc) ->
+          (fun (cname, _, _, loc, _) ->
             try
               let name' = Hashtbl.find labels cname.txt in
               Location.prerr_warning loc
                 (Warnings.Duplicate_definitions
-                   ("label", cname.txt, name', name.txt))
-            with Not_found -> Hashtbl.add labels cname.txt name.txt)
+                   ("label", cname.txt, name', name.dtxt))
+            with Not_found -> Hashtbl.add labels cname.txt name.dtxt)
           fl
     | Ptype_abstract -> ())
     name_sdecl_list
@@ -763,14 +763,14 @@ let transl_type_decl env name_sdecl_list =
   let name_sdecl_list =
     List.map
       (fun (name, sdecl) ->
-        mkloc (name.txt ^"#row") name.loc,
+        mkdoc (name.dtxt ^"#row") name.dloc name.info,
         {sdecl with ptype_kind = Ptype_abstract; ptype_manifest = None})
       fixed_types
     @ name_sdecl_list
   in
   (* Create identifiers. *)
   let id_list =
-    List.map (fun (name, _) -> Ident.create name.txt) name_sdecl_list
+    List.map (fun (name, _) -> Ident.create name.dtxt) name_sdecl_list
   in
   (*
      Since we've introduced fresh idents, make sure the definition
@@ -810,7 +810,7 @@ let transl_type_decl env name_sdecl_list =
   let tdecls =
     List.map2 transl_declaration name_sdecl_list (List.map id_slots id_list) in
   let decls =
-    List.map (fun (id, name_loc, tdecl) -> (id, tdecl.typ_type)) tdecls in
+    List.map (fun (id, name_doc, tdecl) -> (id, tdecl.typ_type)) tdecls in
   current_slot := None;
   (* Check for duplicates *)
   check_duplicates name_sdecl_list;
@@ -862,8 +862,8 @@ let transl_type_decl env name_sdecl_list =
   let final_decls, final_env =
     compute_variance_fixpoint env decls required (List.map init_variance decls)
   in
-  let final_decls = List.map2 (fun (id, name_loc, tdecl) (id2, decl) ->
-        (id, name_loc, { tdecl with typ_type = decl })
+  let final_decls = List.map2 (fun (id, name_doc, tdecl) (id2, decl) ->
+        (id, name_doc, { tdecl with typ_type = decl })
     ) tdecls final_decls in
   (* Done *)
   (final_decls, final_env)
@@ -1014,7 +1014,7 @@ let abstract_type_decl arity =
 let approx_type_decl env name_sdecl_list =
   List.map
     (fun (name, sdecl) ->
-      (Ident.create name.txt,
+      (Ident.create name.dtxt,
        abstract_type_decl (List.length sdecl.ptype_params)))
     name_sdecl_list
 

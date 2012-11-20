@@ -116,9 +116,17 @@ module MakeIterator(Iter : IteratorArgument) : sig
       iter_expression exp;
       Iter.leave_binding pat exp
 
+    and iter_binding_info (b, info) = 
+      iter_binding b
+
     and iter_bindings rec_flag list =
       Iter.enter_bindings rec_flag;
       List.iter iter_binding list;
+      Iter.leave_bindings rec_flag
+
+    and iter_binding_infos rec_flag list =
+      Iter.enter_bindings rec_flag;
+      List.iter iter_binding_info list;
       Iter.leave_bindings rec_flag
 
     and iter_structure_item item =
@@ -127,7 +135,7 @@ module MakeIterator(Iter : IteratorArgument) : sig
         match item.str_desc with
           Tstr_eval exp -> iter_expression exp
         | Tstr_value (rec_flag, list) ->
-            iter_bindings rec_flag list
+            iter_binding_infos rec_flag list
         | Tstr_primitive (id, _, v) -> iter_value_description v
         | Tstr_type list ->
             List.iter (fun (id, _, decl) -> iter_type_declaration decl) list
@@ -154,8 +162,9 @@ module MakeIterator(Iter : IteratorArgument) : sig
                 iter_class_type ct.ci_expr;
                 Iter.leave_class_type_declaration ct;
             ) list
-        | Tstr_include (mexpr, _) ->
+        | Tstr_include (mexpr, _, _) ->
             iter_module_expr mexpr
+        | Tstr_comment com -> ()
       end;
       Iter.leave_structure_item item
 
@@ -173,11 +182,11 @@ module MakeIterator(Iter : IteratorArgument) : sig
       begin match decl.typ_kind with
           Ttype_abstract -> ()
         | Ttype_variant list ->
-            List.iter (fun (s, _, cts, loc) ->
+            List.iter (fun (s, _, cts, loc, com) ->
                 List.iter iter_core_type cts
             ) list
         | Ttype_record list ->
-            List.iter (fun (s, _, mut, ct, loc) ->
+            List.iter (fun (s, _, mut, ct, loc, com) ->
                 iter_core_type ct
             ) list
       end;
@@ -354,11 +363,12 @@ module MakeIterator(Iter : IteratorArgument) : sig
         | Tsig_modtype (id, _, mdecl) ->
             iter_modtype_declaration mdecl
         | Tsig_open _ -> ()
-        | Tsig_include (mty,_) -> iter_module_type mty
+        | Tsig_include (mty,_,_) -> iter_module_type mty
         | Tsig_class list ->
             List.iter iter_class_description list
         | Tsig_class_type list ->
             List.iter iter_class_type_declaration list
+        | Tsig_comment com -> ()
       end;
       Iter.leave_signature_item item;
 
@@ -555,7 +565,7 @@ module MakeIterator(Iter : IteratorArgument) : sig
       Iter.enter_class_field cf;
       begin
         match cf.cf_desc with
-          Tcf_inher (ovf, cl, super, _vals, _meths) ->
+          Tcf_inher (ovf, cl, super, _vals, _meths, com) ->
           iter_class_expr cl
       | Tcf_constr (cty, cty') ->
           iter_core_type cty;
@@ -573,6 +583,7 @@ module MakeIterator(Iter : IteratorArgument) : sig
         List.iter (fun (id, _, exp) -> iter_expression exp) exps; *)
       | Tcf_init exp ->
           iter_expression exp
+      | Tcf_comment com -> ()
       end;
       Iter.leave_class_field cf;
 

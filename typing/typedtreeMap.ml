@@ -90,8 +90,13 @@ module MakeMap(Map : MapArgument) = struct
 
   and map_binding (pat, exp) = (map_pattern pat, map_expression exp)
 
+  and map_binding_info (b, info) = (map_binding b, info)
+
   and map_bindings rec_flag list =
     List.map map_binding list
+
+  and map_binding_infos rec_flag list = 
+    List.map map_binding_info list
 
   and map_structure_item item =
     let item = Map.enter_structure_item item in
@@ -99,7 +104,7 @@ module MakeMap(Map : MapArgument) = struct
       match item.str_desc with
           Tstr_eval exp -> Tstr_eval (map_expression exp)
         | Tstr_value (rec_flag, list) ->
-          Tstr_value (rec_flag, map_bindings rec_flag list)
+          Tstr_value (rec_flag, map_binding_infos rec_flag list)
         | Tstr_primitive (id, name, v) ->
           Tstr_primitive (id, name, map_value_description v)
         | Tstr_type list ->
@@ -139,8 +144,10 @@ module MakeMap(Map : MapArgument) = struct
             (id, name, Map.leave_class_infos { ct with ci_expr = ci_expr})
           ) list in
           Tstr_class_type list
-        | Tstr_include (mexpr, idents) ->
-          Tstr_include (map_module_expr mexpr, idents)
+        | Tstr_include (mexpr, idents, info) ->
+          Tstr_include (map_module_expr mexpr, idents, info)
+        | Tstr_comment com -> 
+          Tstr_comment com
     in
     Map.leave_structure_item { item with str_desc = str_desc}
 
@@ -159,14 +166,14 @@ module MakeMap(Map : MapArgument) = struct
     let typ_kind = match decl.typ_kind with
         Ttype_abstract -> Ttype_abstract
       | Ttype_variant list ->
-        let list = List.map (fun (s, name, cts, loc) ->
-          (s, name, List.map map_core_type cts, loc)
+        let list = List.map (fun (s, name, cts, loc, com) ->
+          (s, name, List.map map_core_type cts, loc, com)
         ) list in
         Ttype_variant list
       | Ttype_record list ->
         let list =
-          List.map (fun (s, name, mut, ct, loc) ->
-            (s, name, mut, map_core_type ct, loc)
+          List.map (fun (s, name, mut, ct, loc, com) ->
+            (s, name, mut, map_core_type ct, loc, com)
           ) list in
         Ttype_record list
     in
@@ -402,10 +409,12 @@ module MakeMap(Map : MapArgument) = struct
         | Tsig_modtype (id, name, mdecl) ->
           Tsig_modtype (id, name, map_modtype_declaration mdecl)
         | Tsig_open (path, lid) -> item.sig_desc
-        | Tsig_include (mty, lid) -> Tsig_include (map_module_type mty, lid)
+        | Tsig_include (mty, lid, info) -> Tsig_include (map_module_type mty, lid, info)
         | Tsig_class list -> Tsig_class (List.map map_class_description list)
         | Tsig_class_type list ->
           Tsig_class_type (List.map map_class_type_declaration list)
+        | Tsig_comment com -> 
+          Tsig_comment com
     in
     Map.leave_signature_item { item with sig_desc = sig_desc }
 
@@ -602,8 +611,8 @@ module MakeMap(Map : MapArgument) = struct
     let cf = Map.enter_class_field cf in
     let cf_desc =
       match cf.cf_desc with
-          Tcf_inher (ovf, cl, super, vals, meths) ->
-            Tcf_inher (ovf, map_class_expr cl, super, vals, meths)
+          Tcf_inher (ovf, cl, super, vals, meths, com) ->
+            Tcf_inher (ovf, map_class_expr cl, super, vals, meths, com)
         | Tcf_constr (cty, cty') ->
           Tcf_constr (map_core_type cty, map_core_type cty')
         | Tcf_val (lab, name, mut, ident, Tcfk_virtual cty, override) ->
@@ -619,6 +628,7 @@ module MakeMap(Map : MapArgument) = struct
           Tcf_meth (lab, name, priv, Tcfk_concrete (map_expression exp),
                     override)
         | Tcf_init exp -> Tcf_init (map_expression exp)
+        | Tcf_comment com -> Tcf_comment com
     in
     Map.leave_class_field { cf with cf_desc = cf_desc }
 end

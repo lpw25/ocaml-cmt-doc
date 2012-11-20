@@ -159,15 +159,16 @@ let iter_expression f e =
   and structure_item str =
     match str.pstr_desc with
     | Pstr_eval e -> expr e
-    | Pstr_value (_, pel) -> List.iter (fun (_, e) -> expr e) pel
+    | Pstr_value (_, pel) -> List.iter (fun ((_, e), _) -> expr e) pel
     | Pstr_primitive _
     | Pstr_type _
     | Pstr_exception _
     | Pstr_modtype _
     | Pstr_open _
     | Pstr_class_type _
-    | Pstr_exn_rebind _ -> ()
-    | Pstr_include me
+    | Pstr_exn_rebind _ 
+    | Pstr_comment _ -> ()
+    | Pstr_include (me, _)
     | Pstr_module (_, me) -> module_expr me
     | Pstr_recmodule l -> List.iter (fun (_, _, me) -> module_expr me) l
     | Pstr_class cdl -> List.iter (fun c -> class_expr c.pci_expr) cdl
@@ -185,10 +186,11 @@ let iter_expression f e =
 
   and class_field cf =
     match cf.pcf_desc with
-    | Pcf_inher (_, ce, _) -> class_expr ce
+    | Pcf_inher (_, ce, _, _) -> class_expr ce
     | Pcf_valvirt _ | Pcf_virt _ | Pcf_constr _ -> ()
     | Pcf_val (_,_,_,e) | Pcf_meth (_,_,_,e) -> expr e
     | Pcf_init e -> expr e
+    | Pcf_comment _ -> ()
 
   in
   expr e
@@ -1036,7 +1038,8 @@ let rec is_nonexpansive exp =
               incr count; true
           | Tcf_init e -> is_nonexpansive e
           | Tcf_constr _ -> true
-          | Tcf_inher _ -> false)
+          | Tcf_inher _ -> false
+          | Tcf_comment _ -> true)
         fields &&
       Vars.fold (fun _ (mut,_,_) b -> decr count; b && mut = Immutable)
         vars true &&
@@ -1057,10 +1060,10 @@ and is_nonexpansive_mod mexp =
       List.for_all
         (fun item -> match item.str_desc with
           | Tstr_eval _ | Tstr_primitive _ | Tstr_type _ | Tstr_modtype _
-          | Tstr_open _ | Tstr_class_type _ | Tstr_exn_rebind _ -> true
+          | Tstr_open _ | Tstr_class_type _ | Tstr_exn_rebind _ | Tstr_comment _ -> true
           | Tstr_value (_, pat_exp_list) ->
-              List.for_all (fun (_, exp) -> is_nonexpansive exp) pat_exp_list
-          | Tstr_module (_, _, m) | Tstr_include (m, _) -> is_nonexpansive_mod m
+              List.for_all (fun ((_, exp), _) -> is_nonexpansive exp) pat_exp_list
+          | Tstr_module (_, _, m) | Tstr_include (m, _, _) -> is_nonexpansive_mod m
           | Tstr_recmodule id_mod_list ->
               List.for_all (fun (_, _, _, m) -> is_nonexpansive_mod m)
                 id_mod_list

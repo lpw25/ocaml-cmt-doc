@@ -495,7 +495,7 @@ let rec class_field self_loc cl_num self_type meths vars
   cf =
   let loc = cf.pcf_loc in
   match cf.pcf_desc with
-    Pcf_inher (ovf, sparent, super) ->
+    Pcf_inher (ovf, sparent, super, com) ->
       let parent = class_expr cl_num val_env par_env sparent in
       let inher =
         match parent.cl_type with
@@ -537,7 +537,7 @@ let rec class_field self_loc cl_num self_type meths vars
             (val_env, met_env, par_env)
       in
       (val_env, met_env, par_env,
-       lazy (mkcf (Tcf_inher (ovf, parent, super, inh_vars, inh_meths)) loc)
+       lazy (mkcf (Tcf_inher (ovf, parent, super, inh_vars, inh_meths, com)) loc)
        :: fields,
        concr_meths, warn_vals, inher)
 
@@ -550,23 +550,23 @@ let rec class_field self_loc cl_num self_type meths vars
         Ctype.generalize_structure ty
       end;
       let (id, val_env, met_env', par_env) =
-        enter_val cl_num vars false lab.txt mut Virtual ty
+        enter_val cl_num vars false lab.dtxt mut Virtual ty
           val_env met_env par_env loc
       in
       (val_env, met_env', par_env,
-       lazy (mkcf (Tcf_val (lab.txt, lab, mut, id, Tcfk_virtual cty,
+       lazy (mkcf (Tcf_val (lab.dtxt, lab, mut, id, Tcfk_virtual cty,
                             met_env' == met_env)) loc)
        :: fields,
        concr_meths, warn_vals, inher)
 
   | Pcf_val (lab, mut, ovf, sexp) ->
-      if Concr.mem lab.txt warn_vals then begin
+      if Concr.mem lab.dtxt warn_vals then begin
         if ovf = Fresh then
-          Location.prerr_warning lab.loc
-            (Warnings.Instance_variable_override[lab.txt])
+          Location.prerr_warning lab.dloc
+            (Warnings.Instance_variable_override[lab.dtxt])
       end else begin
         if ovf = Override then
-          raise(Error(loc, No_overriding ("instance variable", lab.txt)))
+          raise(Error(loc, No_overriding ("instance variable", lab.dtxt)))
       end;
       if !Clflags.principal then Ctype.begin_def ();
       let exp =
@@ -578,32 +578,32 @@ let rec class_field self_loc cl_num self_type meths vars
         Ctype.generalize_structure exp.exp_type
        end;
       let (id, val_env, met_env', par_env) =
-        enter_val cl_num vars false lab.txt mut Concrete exp.exp_type
+        enter_val cl_num vars false lab.dtxt mut Concrete exp.exp_type
           val_env met_env par_env loc
       in
       (val_env, met_env', par_env,
-       lazy (mkcf (Tcf_val (lab.txt, lab, mut, id,
+       lazy (mkcf (Tcf_val (lab.dtxt, lab, mut, id,
                             Tcfk_concrete exp, met_env' == met_env)) loc)
        :: fields,
-       concr_meths, Concr.add lab.txt warn_vals, inher)
+       concr_meths, Concr.add lab.dtxt warn_vals, inher)
 
   | Pcf_virt (lab, priv, sty) ->
-      let cty = virtual_method val_env meths self_type lab.txt priv sty loc in
+      let cty = virtual_method val_env meths self_type lab.dtxt priv sty loc in
       (val_env, met_env, par_env,
-        lazy (mkcf(Tcf_meth (lab.txt, lab, priv, Tcfk_virtual cty, true)) loc)
+        lazy (mkcf(Tcf_meth (lab.dtxt, lab, priv, Tcfk_virtual cty, true)) loc)
        ::fields,
         concr_meths, warn_vals, inher)
 
   | Pcf_meth (lab, priv, ovf, expr)  ->
-      if Concr.mem lab.txt concr_meths then begin
+      if Concr.mem lab.dtxt concr_meths then begin
         if ovf = Fresh then
-          Location.prerr_warning loc (Warnings.Method_override [lab.txt])
+          Location.prerr_warning loc (Warnings.Method_override [lab.dtxt])
       end else begin
         if ovf = Override then
-          raise(Error(loc, No_overriding("method", lab.txt)))
+          raise(Error(loc, No_overriding("method", lab.dtxt)))
       end;
       let (_, ty) =
-        Ctype.filter_self_method val_env lab.txt priv meths self_type
+        Ctype.filter_self_method val_env lab.dtxt priv meths self_type
       in
       begin try match expr.pexp_desc with
         Pexp_poly (sbody, sty) ->
@@ -626,7 +626,7 @@ let rec class_field self_loc cl_num self_type meths vars
           end
       | _ -> assert false
       with Ctype.Unify trace ->
-        raise(Error(loc, Field_type_mismatch ("method", lab.txt, trace)))
+        raise(Error(loc, Field_type_mismatch ("method", lab.dtxt, trace)))
       end;
       let meth_expr = make_method self_loc cl_num expr in
       (* backup variables for Pexp_override *)
@@ -640,13 +640,13 @@ let rec class_field self_loc cl_num self_type meths vars
           vars := vars_local;
           let texp = type_expect met_env meth_expr meth_type in
           Ctype.end_def ();
-          mkcf (Tcf_meth (lab.txt, lab, priv, Tcfk_concrete texp,
+          mkcf (Tcf_meth (lab.dtxt, lab, priv, Tcfk_concrete texp,
               match ovf with
                 Override -> true
               | Fresh -> false)) loc
         end in
       (val_env, met_env, par_env, field::fields,
-       Concr.add lab.txt concr_meths, warn_vals, inher)
+       Concr.add lab.dtxt concr_meths, warn_vals, inher)
 
   | Pcf_constr (sty, sty') ->
       let (cty, cty') = type_constraint val_env sty sty' loc in
@@ -670,6 +670,9 @@ let rec class_field self_loc cl_num self_type meths vars
           mkcf (Tcf_init texp) loc
         end in
       (val_env, met_env, par_env, field::fields, concr_meths, warn_vals, inher)
+  | Pcf_comment com -> 
+      (val_env, met_env, par_env, lazy (mkcf (Tcf_comment com) loc) ::fields,
+       concr_meths, warn_vals, inher)
 
 and class_structure cl_num final val_env met_env loc
   { pcstr_pat = spat; pcstr_fields = str } =
@@ -1256,7 +1259,7 @@ let class_infos define_class kind
       (Ctype.instance env constr_type)
   with Ctype.Unify trace ->
     raise(Error(cl.pci_loc,
-                Constructor_type_mismatch (cl.pci_name.txt, trace)))
+                Constructor_type_mismatch (cl.pci_name.dtxt, trace)))
   end;
 
   (* Class and class type temporary definitions *)
@@ -1406,18 +1409,18 @@ let final_decl env define_class
 (*   (cl.pci_variance, cl.pci_loc)) *)
 
 let extract_type_decls
-    (id, id_loc, clty, ty_id, cltydef, obj_id, obj_abbr, cl_id, cl_abbr,
+    (id, id_doc, clty, ty_id, cltydef, obj_id, obj_abbr, cl_id, cl_abbr,
      arity, pub_meths, coe, expr, required) decls =
   (obj_id, obj_abbr, cl_abbr, clty, cltydef, required) :: decls
 
 let merge_type_decls
-    (id, id_loc, _clty, ty_id, _cltydef, obj_id, _obj_abbr, cl_id, _cl_abbr,
+    (id, id_doc, _clty, ty_id, _cltydef, obj_id, _obj_abbr, cl_id, _cl_abbr,
      arity, pub_meths, coe, expr, req) (obj_abbr, cl_abbr, clty, cltydef) =
-  (id, id_loc, clty, ty_id, cltydef, obj_id, obj_abbr, cl_id, cl_abbr,
+  (id, id_doc, clty, ty_id, cltydef, obj_id, obj_abbr, cl_id, cl_abbr,
    arity, pub_meths, coe, expr, req)
 
 let final_env define_class env
-    (id, id_loc, clty, ty_id, cltydef, obj_id, obj_abbr, cl_id, cl_abbr,
+    (id, id_doc, clty, ty_id, cltydef, obj_id, obj_abbr, cl_id, cl_abbr,
      arity, pub_meths, coe, expr, req) =
   (* Add definitions after cleaning them *)
   Env.add_type obj_id (Subst.type_declaration Subst.identity obj_abbr) (
@@ -1429,7 +1432,7 @@ let final_env define_class env
 
 (* Check that #c is coercible to c if there is a self-coercion *)
 let check_coercions env
-    (id, id_loc, clty, ty_id, cltydef, obj_id, obj_abbr, cl_id, cl_abbr,
+    (id, id_doc, clty, ty_id, cltydef, obj_id, obj_abbr, cl_id, cl_abbr,
      arity, pub_meths, coercion_locs, expr, req) =
   begin match coercion_locs with [] -> ()
   | loc :: _ ->
@@ -1452,7 +1455,7 @@ let check_coercions env
       if not (Ctype.opened_object cl_ty) then
         raise(Error(loc, Cannot_coerce_self obj_ty))
   end;
-  (id, id_loc, clty, ty_id, cltydef, obj_id, obj_abbr, cl_id, cl_abbr,
+  (id, id_doc, clty, ty_id, cltydef, obj_id, obj_abbr, cl_id, cl_abbr,
    arity, pub_meths, req)
 
 (*******************************)
@@ -1462,8 +1465,8 @@ let type_classes define_class approx kind env cls =
     List.map
       (function cl ->
          (cl,
-          Ident.create cl.pci_name.txt, Ident.create cl.pci_name.txt,
-          Ident.create cl.pci_name.txt, Ident.create ("#" ^ cl.pci_name.txt)))
+          Ident.create cl.pci_name.dtxt, Ident.create cl.pci_name.dtxt,
+          Ident.create cl.pci_name.dtxt, Ident.create ("#" ^ cl.pci_name.dtxt)))
       cls
   in
   Ctype.init_def (Ident.current_time ());
@@ -1505,9 +1508,9 @@ let class_type_declarations env cls =
   in
   (List.map
      (function
-       (_, id_loc, _, ty_id, cltydef, obj_id, obj_abbr, cl_id, cl_abbr,
+       (_, id_doc, _, ty_id, cltydef, obj_id, obj_abbr, cl_id, cl_abbr,
         _, _, ci) ->
-       (ty_id, id_loc, cltydef, obj_id, obj_abbr, cl_id, cl_abbr, ci))
+       (ty_id, id_doc, cltydef, obj_id, obj_abbr, cl_id, cl_abbr, ci))
      decl,
    env)
 
@@ -1529,7 +1532,7 @@ let rec unify_parents env ty cl =
   | Tcl_constraint (cl, _, _, _, _) -> unify_parents env ty cl
 and unify_parents_struct env ty st =
   List.iter
-    (function {cf_desc = Tcf_inher (_, cl, _, _, _)} -> unify_parents env ty cl
+    (function {cf_desc = Tcf_inher (_, cl, _, _, _, _)} -> unify_parents env ty cl
       | _ -> ())
     st.cstr_fields
 
